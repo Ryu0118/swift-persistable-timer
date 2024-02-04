@@ -30,7 +30,7 @@ let restoreTimeData = try timer.restore()
 ```
 ### Timer Updates
 Subscribe to timer updates using the timeStream:
-```Swit
+```Swift
 for await timeState in timer.timeStream {
     // Update your UI with the current timeState
 }
