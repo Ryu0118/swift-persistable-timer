@@ -13,7 +13,7 @@ final class ContentModel {
     }
 
     func onAppear() {
-        if let timerData = persistableTimer.getTimerData() {
+        if let timerData = try? persistableTimer.getTimerData() {
             switch timerData.type {
             case .stopwatch:
                 isStopwatchPresented = true

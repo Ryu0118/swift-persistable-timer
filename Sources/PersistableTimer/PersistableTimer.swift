@@ -39,8 +39,8 @@ public final class PersistableTimer {
     }
     #endif
 
-    public func getTimerData() -> RestoreTimerData? {
-        try? container.getTimerData()
+    public func getTimerData() throws -> RestoreTimerData? {
+        try container.getTimerData()
     }
 
     public func isTimerRunning() -> Bool {
