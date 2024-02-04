@@ -10,11 +10,9 @@ public struct RestoreTimerContainer {
         self.userDefaultsClient = UserDefaultsClientImpl(userDefaults: userDefaults)
     }
 
-    #if DEBUG
-    init(userDefaultsClient: any UserDefaultsClient) {
+    package init(userDefaultsClient: any UserDefaultsClient) {
         self.userDefaultsClient = userDefaultsClient
     }
-    #endif
 
     public func getTimerData() throws -> RestoreTimerData {
         guard let restoreTimerData = userDefaultsClient.data(forKey: Const.persistableTimerKey, type: RestoreTimerData.self) else {
@@ -23,8 +21,16 @@ public struct RestoreTimerContainer {
         return restoreTimerData
     }
 
+    public func isTimerRunning() -> Bool {
+        userDefaultsClient.data(forKey: Const.persistableTimerKey, type: RestoreTimerData.self) != nil
+    }
+
     @discardableResult
-    public func start(now: Date = Date(), forceStart: Bool = false) throws -> RestoreTimerData {
+    public func start(
+        now: Date = Date(),
+        type: RestoreType,
+        forceStart: Bool = false
+    ) async throws -> RestoreTimerData {
         if !forceStart {
             guard (try? getTimerData()) == nil else {
                 throw PersistableTimerClientError.timerAlreadyStarted
@@ -32,15 +38,16 @@ public struct RestoreTimerContainer {
         }
         let restoreTimerData = RestoreTimerData(
             startDate: Date(),
-            pausePeriods: [],
+            pausePeriods: [], 
+            type: type,
             stopDate: nil
         )
-        try userDefaultsClient.set(restoreTimerData, forKey: Const.persistableTimerKey)
+        try await userDefaultsClient.set(restoreTimerData, forKey: Const.persistableTimerKey)
         return restoreTimerData
     }
 
     @discardableResult
-    public func resume(now: Date = Date()) throws -> RestoreTimerData {
+    public func resume(now: Date = Date()) async throws -> RestoreTimerData {
         var restoreTimerData = try getTimerData()
         guard let lastPausePeriod = restoreTimerData.pausePeriods.last,
               lastPausePeriod.start == nil
@@ -48,12 +55,12 @@ public struct RestoreTimerContainer {
             throw PersistableTimerClientError.timerHasNotPaused
         }
         restoreTimerData.pausePeriods[restoreTimerData.pausePeriods.endIndex - 1].start = now
-        try userDefaultsClient.set(restoreTimerData, forKey: Const.persistableTimerKey)
+        try await userDefaultsClient.set(restoreTimerData, forKey: Const.persistableTimerKey)
         return restoreTimerData
     }
 
     @discardableResult
-    public func pause(now: Date = Date()) throws -> RestoreTimerData {
+    public func pause(now: Date = Date()) async throws -> RestoreTimerData {
         var restoreTimerData = try getTimerData()
         guard restoreTimerData.pausePeriods.allSatisfy({ $0.start != nil }) else {
             throw PersistableTimerClientError.timerAlreadyPaused
@@ -64,15 +71,15 @@ public struct RestoreTimerContainer {
                 start: nil
             )
         )
-        try userDefaultsClient.set(restoreTimerData, forKey: Const.persistableTimerKey)
+        try await userDefaultsClient.set(restoreTimerData, forKey: Const.persistableTimerKey)
         return restoreTimerData
     }
 
     @discardableResult
-    public func finish(now: Date = Date()) throws -> RestoreTimerData {
+    public func finish(now: Date = Date()) async throws -> RestoreTimerData {
         var restoreTimerData = try getTimerData()
         restoreTimerData.stopDate = now
-        userDefaultsClient.set(nil, forKey: Const.persistableTimerKey)
+        await userDefaultsClient.set(nil, forKey: Const.persistableTimerKey)
         return restoreTimerData
     }
 }

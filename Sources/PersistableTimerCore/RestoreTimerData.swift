@@ -1,14 +1,13 @@
 import Foundation
 
 // タイマーの状態を表す列挙型
-public enum TimerStatus: Codable {
+public enum TimerStatus: Codable, Hashable {
     case running
     case paused
-    case stopped
+    case finished
 }
 
-// 一時停止期間を表す構造体
-public struct PausePeriod: Codable {
+public struct PausePeriod: Codable, Hashable {
     public var pause: Date
     public var start: Date?
 
@@ -18,25 +17,42 @@ public struct PausePeriod: Codable {
     }
 }
 
-// 経過時間とタイマー状態を格納するための構造体
-public struct TimerState: Codable {
+public struct TimerState: Codable, Hashable {
     public var elapsedTime: TimeInterval
     public var status: TimerStatus
+    public var type: RestoreType
 
-    public init(elapsedTime: TimeInterval, status: TimerStatus) {
+    public var time: TimeInterval {
+        switch type {
+        case .stopwatch:
+            elapsedTime
+        case let .timer(duration):
+            duration - elapsedTime
+        }
+    }
+
+    public init(elapsedTime: TimeInterval, status: TimerStatus, type: RestoreType) {
         self.elapsedTime = elapsedTime
         self.status = status
+        self.type = type
     }
 }
 
-public struct RestoreTimerData: Codable {
+public enum RestoreType: Codable, Hashable {
+    case stopwatch
+    case timer(duration: TimeInterval)
+}
+
+public struct RestoreTimerData: Codable, Hashable {
     public var startDate: Date
     public var pausePeriods: [PausePeriod]
+    public var type: RestoreType
     public var stopDate: Date?
 
-    public init(startDate: Date, pausePeriods: [PausePeriod], stopDate: Date?) {
+    public init(startDate: Date, pausePeriods: [PausePeriod], type: RestoreType, stopDate: Date? = nil) {
         self.startDate = startDate
         self.pausePeriods = pausePeriods
+        self.type = type
         self.stopDate = stopDate
     }
 
@@ -58,12 +74,13 @@ public struct RestoreTimerData: Codable {
         }
 
         if let _ = stopDate {
-            status = .stopped
+            status = .finished
         }
 
         return TimerState(
             elapsedTime: max(elapsedTime, 0),
-            status: status
+            status: status,
+            type: type
         )
     }
 }

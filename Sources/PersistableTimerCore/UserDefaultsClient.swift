@@ -1,6 +1,6 @@
 import Foundation
 
-protocol UserDefaultsClient {
+package protocol UserDefaultsClient {
     func data<T: Decodable>(
         forKey: String,
         type: T.Type
@@ -9,19 +9,19 @@ protocol UserDefaultsClient {
     func set(
         _ value: some Encodable,
         forKey: String
-    ) throws
+    ) async throws
 
-    func set(_ value: Any?, forKey: String)
+    func set(_ value: Any?, forKey: String) async
 }
 
-struct UserDefaultsClientImpl: UserDefaultsClient {
+package struct UserDefaultsClientImpl: UserDefaultsClient {
     private let userDefaults: UserDefaults
     
-    init(userDefaults: UserDefaults) {
+    package init(userDefaults: UserDefaults) {
         self.userDefaults = userDefaults
     }
 
-    func data<T: Decodable>(
+    package func data<T: Decodable>(
         forKey: String,
         type: T.Type
     ) -> T? {
@@ -36,25 +36,27 @@ struct UserDefaultsClientImpl: UserDefaultsClient {
         return nil
     }
 
-    func set(
+    package func set(
         _ value: some Encodable,
         forKey: String
-    ) throws {
+    ) async throws {
         let encoder = JSONEncoder()
         let data = try encoder.encode(value)
         userDefaults.set(data, forKey: forKey)
     }
 
-    func set(_ value: Any?, forKey: String) {
+    package func set(_ value: Any?, forKey: String) async {
         userDefaults.set(value, forKey: forKey)
     }
 }
 
 #if DEBUG
-final class MockUserDefaultsClient: UserDefaultsClient {
+package final class MockUserDefaultsClient: UserDefaultsClient {
     var dataStore: [String: Data] = [:]
 
-    func data<T>(
+    package init() {}
+
+    package func data<T>(
         forKey: String,
         type: T.Type
     ) -> T? where T : Decodable {
@@ -63,16 +65,16 @@ final class MockUserDefaultsClient: UserDefaultsClient {
         return try? decoder.decode(type, from: data)
     }
 
-    func set(
+    package func set(
         _ value: some Encodable,
         forKey: String
-    ) throws {
+    ) async throws {
         let encoder = JSONEncoder()
         let data = try encoder.encode(value)
         dataStore[forKey] = data
     }
 
-    func set(_ value: Any?, forKey: String) {
+    package func set(_ value: Any?, forKey: String) async {
         dataStore[forKey] = value as? Data
     }
 }
