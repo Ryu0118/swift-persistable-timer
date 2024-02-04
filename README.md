@@ -4,6 +4,7 @@ PersistableTimer is a Swift library designed to manage and persist timer states 
 ## Usage
 Instantiate PersistableTimer with your choice of data source (UserDefaults or in-memory for testing and previewing purposes):
 ```Swift
+let timer = PersistableTimer(dataSourceType: .inMemory)
 let timer = PersistableTimer(dataSourceType: .userDefaults(.standard))
 let timer = PersistableTimer(dataSourceType: .userDefaults(.standard), updateInterval: 0.5)
 ```
