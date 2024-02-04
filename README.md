@@ -15,7 +15,7 @@ Start a stopwatch or countdown timer. Optionally force the start of a new timer 
 ```Swift
 try await timer.start(type: .stopwatch)
 // Start a countdown timer with a duration of 100 seconds
-try await persistableTimer.start(type: .timer(duration: 100))
+try await timer.start(type: .timer(duration: 100))
 ```
 ### Pausing, Resuming, and Finishing
 Pause and resume a running timer, or mark it as finished:
