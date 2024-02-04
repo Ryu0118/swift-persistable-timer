@@ -2,7 +2,7 @@
 PersistableTimer is a Swift library designed to manage and persist timer states across application sessions. This library ensures that your stopwatch or countdown timer can maintain its state even after the app is killed, providing an efficient solution for time tracking in your iOS applications.
 
 ## Example
-- [Example App](https://github.com/Ryu0118/swift-persistable-timer/Examples/TestTimer)
+- [Example App](https://github.com/Ryu0118/swift-persistable-timer/tree/main/Examples/TimerTest)
 
 ## Usage
 Instantiate PersistableTimer with your choice of data source (UserDefaults or in-memory for testing and previewing purposes):
