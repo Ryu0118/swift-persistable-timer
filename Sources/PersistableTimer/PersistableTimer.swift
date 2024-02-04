@@ -17,27 +17,24 @@ public final class PersistableTimer {
     private let container: RestoreTimerContainer
     private let now: () -> Date
 
+    let updateInterval: TimeInterval
+
     public init(
         dataSourceType: DataSourceType,
+        updateInterval: TimeInterval = 1,
         now: @escaping () -> Date = { Date() }
     ) {
         let dataSource: any DataSource =
-        switch dataSourceType {
-        case .inMemory:
-            InMemoryDataSource()
-        case .userDefaults(let userDefaults):
-            UserDefaultsClient(userDefaults: userDefaults)
-        }
+            switch dataSourceType {
+            case .inMemory:
+                InMemoryDataSource()
+            case .userDefaults(let userDefaults):
+                UserDefaultsClient(userDefaults: userDefaults)
+            }
         container = RestoreTimerContainer(dataSource: dataSource)
         self.now = now
+        self.updateInterval = updateInterval
     }
-
-    #if DEBUG
-    init(container: RestoreTimerContainer) {
-        self.container = container
-        self.now = { Date() }
-    }
-    #endif
 
     public func getTimerData() throws -> RestoreTimerData? {
         try container.getTimerData()
@@ -88,11 +85,15 @@ public final class PersistableTimer {
         invalidate()
     }
 
-    public func finish() async throws {
+    public func finish(isResetTime: Bool = false) async throws {
         do {
             let restoreTimerData = try await container.finish(now: now())
+            var elapsedTimeAndStatus = restoreTimerData.elapsedTimeAndStatus(now: now())
+            if isResetTime {
+                elapsedTimeAndStatus.elapsedTime = 0
+            }
             self.restoreTimerData = restoreTimerData
-            stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now()))
+            stream.continuation.yield(elapsedTimeAndStatus)
             invalidate(isFinish: true)
         } catch {
             invalidate(isFinish: true)
@@ -101,7 +102,7 @@ public final class PersistableTimer {
     }
 
     private func startTimerIfNeeded() {
-        let timer = Timer(fire: now(), interval: 1, repeats: true) { [weak self] timer in
+        let timer = Timer(fire: now(), interval: updateInterval, repeats: true) { [weak self] timer in
             guard let self,
                   let restoreTimerData = try? self.restoreTimerData ?? self.container.getTimerData()
             else {
