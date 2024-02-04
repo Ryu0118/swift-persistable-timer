@@ -1,12 +1,13 @@
 import Foundation
 
-// タイマーの状態を表す列挙型
+/// Represents the status of a timer.
 public enum TimerStatus: Codable, Hashable {
     case running
     case paused
     case finished
 }
 
+/// Represents a period during which the timer is paused.
 public struct PausePeriod: Codable, Hashable {
     public var pause: Date
     public var start: Date?
@@ -17,6 +18,7 @@ public struct PausePeriod: Codable, Hashable {
     }
 }
 
+/// Represents the state of a timer, including elapsed time and status.
 public struct TimerState: Codable, Hashable {
     public var elapsedTime: TimeInterval
     public var status: TimerStatus
@@ -38,11 +40,13 @@ public struct TimerState: Codable, Hashable {
     }
 }
 
+/// Represents the type of restoration for a timer, either a stopwatch or a countdown timer.
 public enum RestoreType: Codable, Hashable {
     case stopwatch
     case timer(duration: TimeInterval)
 }
 
+/// Represents the data required to restore a timer's state.
 public struct RestoreTimerData: Codable, Hashable {
     public var startDate: Date
     public var pausePeriods: [PausePeriod]
@@ -56,6 +60,10 @@ public struct RestoreTimerData: Codable, Hashable {
         self.stopDate = stopDate
     }
 
+    /// Calculates the elapsed time and determines the current status of the timer.
+    ///
+    /// - Parameter now: The current date and time, defaults to `Date()`.
+    /// - Returns: The `TimerState` representing the elapsed time and the current status.
     public func elapsedTimeAndStatus(now: Date = Date()) -> TimerState {
         let endDate = stopDate ?? now
         var elapsedTime = endDate.timeIntervalSince(startDate)

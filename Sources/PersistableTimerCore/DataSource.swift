@@ -1,5 +1,6 @@
 import Foundation
 
+/// A protocol defining the requirements for a data source.
 package protocol DataSource {
     func data<T: Decodable>(
         forKey: String,
@@ -14,9 +15,16 @@ package protocol DataSource {
     func set(_ value: Any?, forKey: String) async
 }
 
+/// An enum representing the type of data source to be used.
+public enum DataSourceType {
+    case userDefaults(UserDefaults)
+    case inMemory
+}
+
+/// A client for interacting with UserDefaults as a data source.
 package struct UserDefaultsClient: DataSource {
     private let userDefaults: UserDefaults
-    
+
     package init(userDefaults: UserDefaults) {
         self.userDefaults = userDefaults
     }
@@ -50,6 +58,7 @@ package struct UserDefaultsClient: DataSource {
     }
 }
 
+/// A client for managing data in memory, mainly for testing purposes.
 package final class InMemoryDataSource: DataSource {
     var dataStore: [String: Data] = [:]
 
