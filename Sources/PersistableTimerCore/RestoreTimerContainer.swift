@@ -4,25 +4,25 @@ public struct RestoreTimerContainer {
     private enum Const {
         static let persistableTimerKey = "persistableTimerKey"
     }
-    private let userDefaultsClient: any UserDefaultsClient
+    private let dataSource: any DataSource
 
     public init(userDefaults: UserDefaults) {
-        self.userDefaultsClient = UserDefaultsClientImpl(userDefaults: userDefaults)
+        self.dataSource = UserDefaultsClient(userDefaults: userDefaults)
     }
 
-    package init(userDefaultsClient: any UserDefaultsClient) {
-        self.userDefaultsClient = userDefaultsClient
+    package init(dataSource: any DataSource) {
+        self.dataSource = dataSource
     }
 
     public func getTimerData() throws -> RestoreTimerData {
-        guard let restoreTimerData = userDefaultsClient.data(forKey: Const.persistableTimerKey, type: RestoreTimerData.self) else {
+        guard let restoreTimerData = dataSource.data(forKey: Const.persistableTimerKey, type: RestoreTimerData.self) else {
             throw PersistableTimerClientError.timerHasNotStarted
         }
         return restoreTimerData
     }
 
     public func isTimerRunning() -> Bool {
-        userDefaultsClient.data(forKey: Const.persistableTimerKey, type: RestoreTimerData.self) != nil
+        dataSource.data(forKey: Const.persistableTimerKey, type: RestoreTimerData.self) != nil
     }
 
     @discardableResult
@@ -42,7 +42,8 @@ public struct RestoreTimerContainer {
             type: type,
             stopDate: nil
         )
-        try await userDefaultsClient.set(restoreTimerData, forKey: Const.persistableTimerKey)
+        try await dataSource.set(restoreTimerData, forKey: Const.persistableTimerKey)
+        print(dataSource.data(forKey: Const.persistableTimerKey, type: RestoreTimerData.self))
         return restoreTimerData
     }
 
@@ -55,7 +56,7 @@ public struct RestoreTimerContainer {
             throw PersistableTimerClientError.timerHasNotPaused
         }
         restoreTimerData.pausePeriods[restoreTimerData.pausePeriods.endIndex - 1].start = now
-        try await userDefaultsClient.set(restoreTimerData, forKey: Const.persistableTimerKey)
+        try await dataSource.set(restoreTimerData, forKey: Const.persistableTimerKey)
         return restoreTimerData
     }
 
@@ -71,7 +72,7 @@ public struct RestoreTimerContainer {
                 start: nil
             )
         )
-        try await userDefaultsClient.set(restoreTimerData, forKey: Const.persistableTimerKey)
+        try await dataSource.set(restoreTimerData, forKey: Const.persistableTimerKey)
         return restoreTimerData
     }
 
@@ -79,7 +80,7 @@ public struct RestoreTimerContainer {
     public func finish(now: Date = Date()) async throws -> RestoreTimerData {
         var restoreTimerData = try getTimerData()
         restoreTimerData.stopDate = now
-        await userDefaultsClient.set(nil, forKey: Const.persistableTimerKey)
+        await dataSource.set(nil, forKey: Const.persistableTimerKey)
         return restoreTimerData
     }
 }

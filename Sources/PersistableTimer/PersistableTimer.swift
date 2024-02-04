@@ -1,7 +1,7 @@
 import Foundation
 import PersistableTimerCore
 
-public enum DataSource {
+public enum DataSourceType {
     case userDefaults(UserDefaults)
     case inMemory
 }
@@ -18,17 +18,17 @@ public final class PersistableTimer {
     private let now: () -> Date
 
     public init(
-        dataSource: DataSource,
+        dataSourceType: DataSourceType,
         now: @escaping () -> Date = { Date() }
     ) {
-        let userDefaultsClient: any UserDefaultsClient =
-        switch dataSource {
+        let dataSource: any DataSource =
+        switch dataSourceType {
         case .inMemory:
-            MockUserDefaultsClient()
+            InMemoryDataSource()
         case .userDefaults(let userDefaults):
-            UserDefaultsClientImpl(userDefaults: userDefaults)
+            UserDefaultsClient(userDefaults: userDefaults)
         }
-        container = RestoreTimerContainer(userDefaultsClient: userDefaultsClient)
+        container = RestoreTimerContainer(dataSource: dataSource)
         self.now = now
     }
 
@@ -89,11 +89,15 @@ public final class PersistableTimer {
     }
 
     public func finish() async throws {
-        let restoreTimerData = try await container.finish(now: now())
-        self.restoreTimerData = restoreTimerData
-
-        stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now()))
-        invalidate(isFinish: true)
+        do {
+            let restoreTimerData = try await container.finish(now: now())
+            self.restoreTimerData = restoreTimerData
+            stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now()))
+            invalidate(isFinish: true)
+        } catch {
+            invalidate(isFinish: true)
+            throw error
+        }
     }
 
     private func startTimerIfNeeded() {

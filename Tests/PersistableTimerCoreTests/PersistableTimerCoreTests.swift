@@ -3,11 +3,11 @@ import XCTest
 
 final class PersistableTimerCoreTests: XCTestCase {
     var RestoreTimerContainer: RestoreTimerContainer!
-    var mockUserDefaultsClient: MockUserDefaultsClient!
+    var mockUserDefaultsClient: InMemoryDataSource!
 
     override func setUp() {
         super.setUp()
-        mockUserDefaultsClient = MockUserDefaultsClient()
+        mockUserDefaultsClient = InMemoryDataSource()
         RestoreTimerContainer = PersistableTimerCore.RestoreTimerContainer(userDefaultsClient: mockUserDefaultsClient)
     }
 

@@ -8,7 +8,7 @@ struct TimerTestApp: App {
             ContentView(
                 contentModel: ContentModel(
                     persistableTimer: PersistableTimer(
-                        dataSource: .userDefaults(.standard)
+                        dataSourceType: .userDefaults(.standard)
                     )
                 )
             )

@@ -1,6 +1,6 @@
 import Foundation
 
-package protocol UserDefaultsClient {
+package protocol DataSource {
     func data<T: Decodable>(
         forKey: String,
         type: T.Type
@@ -14,7 +14,7 @@ package protocol UserDefaultsClient {
     func set(_ value: Any?, forKey: String) async
 }
 
-package struct UserDefaultsClientImpl: UserDefaultsClient {
+package struct UserDefaultsClient: DataSource {
     private let userDefaults: UserDefaults
     
     package init(userDefaults: UserDefaults) {
@@ -25,7 +25,7 @@ package struct UserDefaultsClientImpl: UserDefaultsClient {
         forKey: String,
         type: T.Type
     ) -> T? {
-        if let data = userDefaults.data(forKey: forKey) {
+        if let data = userDefaults.object(forKey: forKey) as? Data {
             let decoder = JSONDecoder()
             do {
                 return try decoder.decode(type, from: data)
@@ -50,8 +50,7 @@ package struct UserDefaultsClientImpl: UserDefaultsClient {
     }
 }
 
-#if DEBUG
-package final class MockUserDefaultsClient: UserDefaultsClient {
+package final class InMemoryDataSource: DataSource {
     var dataStore: [String: Data] = [:]
 
     package init() {}
@@ -78,4 +77,3 @@ package final class MockUserDefaultsClient: UserDefaultsClient {
         dataStore[forKey] = value as? Data
     }
 }
-#endif

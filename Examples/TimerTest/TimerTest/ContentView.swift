@@ -28,7 +28,7 @@ struct ContentView: View {
     @Bindable var contentModel: ContentModel
 
     var body: some View {
-        Form {
+        List {
             Text("Timer")
                 .onTapGesture {
                     contentModel.isTimerPresented = true
@@ -40,12 +40,17 @@ struct ContentView: View {
         }
         .sheet(isPresented: $contentModel.isTimerPresented) {
             TimerView(
-                timerModel: .init(
+                timerModel: TimerModel(
                     persistableTimer: contentModel.persistableTimer
                 )
             )
         }
         .sheet(isPresented: $contentModel.isStopwatchPresented) {
+            StopwatchView(
+                stopwatchModel: StopwatchModel(
+                    persistableTimer: contentModel.persistableTimer
+                )
+            )
         }
         .onAppear {
             contentModel.onAppear()
@@ -56,7 +61,7 @@ struct ContentView: View {
 #Preview {
     ContentView(
         contentModel: ContentModel(
-            persistableTimer: PersistableTimer(dataSource: .inMemory)
+            persistableTimer: PersistableTimer(dataSourceType: .inMemory)
         )
     )
 }

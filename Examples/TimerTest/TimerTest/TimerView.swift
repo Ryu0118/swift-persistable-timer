@@ -11,6 +11,10 @@ final class TimerModel {
     var selectedMinutes: Int = 0
     var selectedSeconds: Int = 0
 
+    var duration: TimeInterval {
+        TimeInterval((selectedHours * 60 * 60) + (selectedMinutes * 60) + selectedSeconds)
+    }
+
     var buttonTitle: String {
         switch timerState?.status {
         case .running:
@@ -23,6 +27,14 @@ final class TimerModel {
             "Start"
         }
     }
+
+    var dateFormatter: DateComponentsFormatter = {
+        let dateFormatter = DateComponentsFormatter()
+        dateFormatter.unitsStyle = .positional
+        dateFormatter.zeroFormattingBehavior = .pad
+        dateFormatter.allowedUnits = [.hour, .minute, .second]
+        return dateFormatter
+    }()
 
     init(persistableTimer: PersistableTimer) {
         self.persistableTimer = persistableTimer
@@ -38,8 +50,8 @@ final class TimerModel {
             case .finished, nil:
                 try await persistableTimer.start(
                     type: .timer(
-                        duration: TimeInterval((selectedHours * 60 * 60) + (selectedMinutes * 60) + selectedSeconds
-                    ))
+                        duration: duration
+                    )
                 )
             }
         } catch {
@@ -49,16 +61,17 @@ final class TimerModel {
 
     func synchronize() async {
         do {
-            self.timerState = try? persistableTimer.restore().elapsedTimeAndStatus()
+            self.timerState = try persistableTimer.restore().elapsedTimeAndStatus()
         } catch {
             print(error)
         }
-        let dateFormatter = DateComponentsFormatter()
-        dateFormatter.unitsStyle = .positional
-        dateFormatter.allowedUnits = [.hour, .minute, .second]
 
         for await timerState in persistableTimer.timeStream {
-            timerText = dateFormatter.string(from: timerState.time) ?? "00:00:00"
+            var timerText = dateFormatter.string(from: timerState.time) ?? "00:00:00"
+            if timerState.time < 0 {
+                timerText = "+" + timerText
+            }
+            self.timerText = timerText
             self.timerState = timerState
         }
     }
@@ -106,7 +119,7 @@ struct TimerView: View {
     TimerView(
         timerModel: TimerModel(
             persistableTimer: PersistableTimer(
-                dataSource: .inMemory
+                dataSourceType: .inMemory
             )
         )
     )
