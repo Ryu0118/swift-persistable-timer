@@ -1,5 +1,5 @@
 # PersistableTimer
-PersistableTimer is a Swift library designed to manage and persist timer states across application sessions. This library ensures that your stopwatch or countdown timer can maintain its state even after the app is killed, providing an efficient solution for time tracking in your iOS applications.
+Persistent timers and stopwatches ensuring seamless state restoration.
 
 ## Example
 - [Example App](https://github.com/Ryu0118/swift-persistable-timer/tree/main/Examples/TimerTest)
@@ -31,10 +31,10 @@ try await timer.finish(isResetTime: false)
 ```
 ### Restoring Timer State
 Restore the timer's state after an app restart:
-
 ```Swift
-let restoreTimeData = try timer.restore()
+try timer.restore()
 ```
+
 ### Timer Updates
 Subscribe to timer updates using the timeStream:
 ```Swift
@@ -42,3 +42,4 @@ for await timeState in timer.timeStream {
     // Update your UI with the current timeState
 }
 ```
+
