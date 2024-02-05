@@ -61,7 +61,7 @@ final class TimerModel {
 
     func synchronize() async {
         do {
-            self.timerState = try persistableTimer.restore().elapsedTimeAndStatus()
+            try persistableTimer.restore()
         } catch {
             print(error)
         }
