@@ -40,6 +40,7 @@ Subscribe to timer updates using the timeStream:
 ```Swift
 for await timeState in timer.timeStream {
     // Update your UI with the current timeState
+    print(timerState.time)
 }
 ```
 
