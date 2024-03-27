@@ -35,7 +35,6 @@ let package = Package(
             dependencies: [
                 "PersistableTimerCore"
             ],
-            path: "Sources/PersistableTimer",
             resources: [.copy("PrivacyInfo.xcprivacy")]
         ),
         .testTarget(
