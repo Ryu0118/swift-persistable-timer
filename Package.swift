@@ -24,6 +24,10 @@ let package = Package(
             targets: ["PersistableTimer"]
         )
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-testing", exact: "0.10.0"),
+    ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
@@ -33,13 +37,17 @@ let package = Package(
         .target(
             name: "PersistableTimer",
             dependencies: [
-                "PersistableTimerCore"
+                "PersistableTimerCore",
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
             ],
             resources: [.copy("PrivacyInfo.xcprivacy")]
         ),
         .testTarget(
             name: "PersistableTimerCoreTests",
-            dependencies: ["PersistableTimerCore"]
+            dependencies: [
+                "PersistableTimerCore",
+                .product(name: "Testing", package: "swift-testing")
+            ]
         ),
     ]
 )

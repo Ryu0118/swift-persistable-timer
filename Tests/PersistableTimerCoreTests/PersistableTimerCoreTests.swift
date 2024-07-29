@@ -1,193 +1,205 @@
-import XCTest
+import Testing
+import Foundation
 @testable import PersistableTimerCore
 
-final class PersistableTimerCoreTests: XCTestCase {
+@Suite struct PersistableTimerCoreTests {
     var RestoreTimerContainer: RestoreTimerContainer!
     var mockUserDefaultsClient: InMemoryDataSource!
 
-    override func setUp() {
-        super.setUp()
+    init() {
         mockUserDefaultsClient = InMemoryDataSource()
-        RestoreTimerContainer = PersistableTimerCore.RestoreTimerContainer(userDefaultsClient: mockUserDefaultsClient)
+        RestoreTimerContainer = PersistableTimerCore.RestoreTimerContainer(dataSource: mockUserDefaultsClient)
     }
 
-    override func tearDown() {
-        RestoreTimerContainer = nil
-        mockUserDefaultsClient = nil
-        super.tearDown()
-    }
-
-    func testStartTimerSuccessfully() throws {
+    @Test func startTimerSuccessfully() async throws {
         let expectedStartDate = Date()
-        let result = try RestoreTimerContainer.start(now: expectedStartDate, type: .timer(duration: 10))
-        XCTAssertEqual(result.startDate.timeIntervalSince1970, expectedStartDate.timeIntervalSince1970, accuracy: 0.001)
-        XCTAssertTrue(result.pausePeriods.isEmpty)
-        XCTAssertNil(result.stopDate)
+        let result = try await RestoreTimerContainer.start(now: expectedStartDate, type: .timer(duration: 10))
+        #expect(result.startDate.timeIntervalSince1970.floorInt == expectedStartDate.timeIntervalSince1970.floorInt)
+        #expect(result.pausePeriods.isEmpty)
+        #expect(result.stopDate == nil)
     }
 
-    func testStartTimerThrowsErrorWhenAlreadyStarted() throws {
-        try RestoreTimerContainer.start(type: .stopwatch)
-        XCTAssertThrowsError(try RestoreTimerContainer.start(type: .stopwatch)) { error in
-            XCTAssertEqual(error as? PersistableTimerClientError, .timerAlreadyStarted)
+    @Test func startTimerThrowsErrorWhenAlreadyStarted() async throws {
+        try await RestoreTimerContainer.start(type: .stopwatch)
+        await #expect { try await RestoreTimerContainer.start(type: .stopwatch) } throws: { error in
+            let persistableTimerClientError = try #require(error as? PersistableTimerClientError)
+            return persistableTimerClientError == .timerAlreadyStarted
         }
     }
 
-    func testStartTimerForcefullyWhenAlreadyStarted() throws {
-        try RestoreTimerContainer.start(type: .timer(duration: 10))
-        let result = try RestoreTimerContainer.start(type: .timer(duration: 10), forceStart: true)
-        XCTAssertNotNil(result.startDate)
+    @Test func startTimerForcefullyWhenAlreadyStarted() async throws {
+        try await RestoreTimerContainer.start(type: .timer(duration: 10))
+        let result = try await RestoreTimerContainer.start(type: .timer(duration: 10), forceStart: true)
+        #expect(result.startDate != nil)
     }
 
-    func testPauseTimerSuccessfully() throws {
+    @Test func pauseTimerSuccessfully() async throws {
         let startDate = Date()
         let pauseDate = Date()
-        try RestoreTimerContainer.start(now: startDate, type: .stopwatch)
-        let result = try RestoreTimerContainer.pause(now: pauseDate)
-        XCTAssertEqual(result.pausePeriods.count, 1)
-        XCTAssertEqual(result.pausePeriods.first?.pause, pauseDate)
-        XCTAssertNil(result.pausePeriods.first?.start)
-        XCTAssertEqual(result.startDate.timeIntervalSince1970, startDate.timeIntervalSince1970, accuracy: 0.001)
+        try await RestoreTimerContainer.start(now: startDate, type: .stopwatch)
+        let result = try await RestoreTimerContainer.pause(now: pauseDate)
+        #expect(result.pausePeriods.count == 1)
+        #expect(result.pausePeriods.first?.pause == pauseDate)
+        #expect(result.pausePeriods.first?.start == nil)
+        #expect(result.startDate.timeIntervalSince1970.floorInt == startDate.timeIntervalSince1970.floorInt)
     }
 
-    func testPauseTimerThrowsErrorWhenAlreadyPaused() throws {
-        try RestoreTimerContainer.start(type: .stopwatch)
-        try RestoreTimerContainer.pause()
-        XCTAssertThrowsError(try RestoreTimerContainer.pause()) { error in
-            XCTAssertEqual(error as? PersistableTimerClientError, .timerAlreadyPaused)
+    @Test func pauseTimerThrowsErrorWhenAlreadyPaused() async throws {
+        try await RestoreTimerContainer.start(type: .stopwatch)
+        try await RestoreTimerContainer.pause()
+        await #expect { try await RestoreTimerContainer.pause() } throws: { error in
+            let persistableTimerClientError = try #require(error as? PersistableTimerClientError)
+            return persistableTimerClientError == .timerAlreadyPaused
         }
     }
 
-    func testResumeTimerSuccessfully() throws {
-        try RestoreTimerContainer.start(type: .stopwatch)
-        try RestoreTimerContainer.pause()
-        let result = try RestoreTimerContainer.resume()
-        XCTAssertEqual(result.pausePeriods.count, 1)
-        XCTAssertNotNil(result.pausePeriods.first?.start)
+    @Test func resumeTimerSuccessfully() async throws {
+        try await RestoreTimerContainer.start(type: .stopwatch)
+        try await RestoreTimerContainer.pause()
+        let result = try await RestoreTimerContainer.resume()
+        #expect(result.pausePeriods.count == 1)
+        #expect(result.pausePeriods.first?.start != nil)
     }
 
-    func testResumeTimerThrowsErrorWhenNotPaused() throws {
-        try RestoreTimerContainer.start(type: .stopwatch)
-        XCTAssertThrowsError(try RestoreTimerContainer.resume()) { error in
-            XCTAssertEqual(error as? PersistableTimerClientError, .timerHasNotPaused)
+    @Test func resumeTimerThrowsErrorWhenNotPaused() async throws {
+        try await RestoreTimerContainer.start(type: .stopwatch)
+        await #expect { try await RestoreTimerContainer.resume() } throws: { error in
+            let persistableTimerClientError = try #require(error as? PersistableTimerClientError)
+            return persistableTimerClientError == .timerHasNotPaused
         }
     }
 
-    func testFinishTimerSuccessfullyWhenRunning() throws {
-        try RestoreTimerContainer.start(type: .stopwatch)
-        let result = try RestoreTimerContainer.finish()
-        XCTAssertNotNil(result.stopDate)
+    @Test func finishTimerSuccessfullyWhenRunning() async throws {
+        try await  RestoreTimerContainer.start(type: .stopwatch)
+        let result = try await RestoreTimerContainer.finish()
+        #expect(result.stopDate != nil)
     }
 
-    func testFinishTimerSuccessfullyWhenPaused() throws {
-        try RestoreTimerContainer.start(type: .stopwatch)
-        try RestoreTimerContainer.pause()
-        let result = try RestoreTimerContainer.finish()
-        XCTAssertNotNil(result.stopDate)
+    @Test func finishTimerSuccessfullyWhenPaused() async throws {
+        try await RestoreTimerContainer.start(type: .stopwatch)
+        try await RestoreTimerContainer.pause()
+        let result = try await RestoreTimerContainer.finish()
+        #expect(result.stopDate != nil)
     }
 
-    func testFinishTimerThrowsErrorWhenNotStarted() throws {
-        XCTAssertThrowsError(try RestoreTimerContainer.finish()) { error in
-            XCTAssertEqual(error as? PersistableTimerClientError, .timerHasNotStarted)
+    @Test func finishTimerThrowsErrorWhenNotStarted() async throws {
+        await #expect { try await RestoreTimerContainer.finish() } throws: { error in
+            let persistableTimerClientError = try #require(error as? PersistableTimerClientError)
+            return persistableTimerClientError == .timerHasNotStarted
         }
     }
 
-    func testGetTimerDataThrowsErrorWhenNotStarted() throws {
-        XCTAssertThrowsError(try RestoreTimerContainer.getTimerData()) { error in
-            XCTAssertEqual(error as? PersistableTimerClientError, .timerHasNotStarted)
+    @Test func getTimerDataThrowsErrorWhenNotStarted() async throws {
+        #expect { try RestoreTimerContainer.getTimerData() } throws: { error in
+            let persistableTimerClientError = try #require(error as? PersistableTimerClientError)
+            return persistableTimerClientError == .timerHasNotStarted
         }
     }
 
-    func testGetTimerDataReturnsCorrectDataWhenRunning() throws {
-        let startedTimerData = try RestoreTimerContainer.start(type: .stopwatch)
+    @Test func getTimerDataReturnsCorrectDataWhenRunning() async throws {
+        let startedTimerData = try await RestoreTimerContainer.start(type: .stopwatch)
         let fetchedTimerData = try RestoreTimerContainer.getTimerData()
-        XCTAssertEqual(fetchedTimerData.startDate, startedTimerData.startDate)
-        XCTAssertEqual(fetchedTimerData.pausePeriods.count, startedTimerData.pausePeriods.count)
+        #expect(fetchedTimerData.startDate == startedTimerData.startDate)
+        #expect(fetchedTimerData.pausePeriods.count == startedTimerData.pausePeriods.count)
     }
 
-    func testPauseTimerThrowsErrorWhenStopped() throws {
-        try RestoreTimerContainer.start(type: .stopwatch)
-        try RestoreTimerContainer.finish()
-        XCTAssertThrowsError(try RestoreTimerContainer.pause()) { error in
-            XCTAssertEqual(error as? PersistableTimerClientError, .timerHasNotStarted)
+    @Test func pauseTimerThrowsErrorWhenStopped() async throws {
+        try await RestoreTimerContainer.start(type: .stopwatch)
+        try await RestoreTimerContainer.finish()
+        await #expect { try await RestoreTimerContainer.pause() } throws: { error in
+            let persistableTimerClientError = try #require(error as? PersistableTimerClientError)
+            return persistableTimerClientError == .timerHasNotStarted
         }
     }
 
-    func testResumeTimerThrowsErrorWhenStopped() throws {
-        try RestoreTimerContainer.start(type: .stopwatch)
-        try RestoreTimerContainer.pause()
-        try RestoreTimerContainer.finish()
-        XCTAssertThrowsError(try RestoreTimerContainer.resume()) { error in
-            XCTAssertEqual(error as? PersistableTimerClientError, .timerHasNotStarted)
+    @Test func resumeTimerThrowsErrorWhenStopped() async throws {
+        try await RestoreTimerContainer.start(type: .stopwatch)
+        try await RestoreTimerContainer.pause()
+        try await RestoreTimerContainer.finish()
+        await #expect { try await RestoreTimerContainer.resume() } throws: { error in
+            let persistableTimerClientError = try #require(error as? PersistableTimerClientError)
+            return persistableTimerClientError == .timerHasNotStarted
         }
     }
 
-    func testElapsedTimeAndStatusReturnsRunningAndCorrectTime() throws {
+    @Test func elapsedTimeAndStatusReturnsRunningAndCorrectTime() async throws {
         let startDate = Date()
-        try RestoreTimerContainer.start(now: startDate, type: .stopwatch)
+        try await RestoreTimerContainer.start(now: startDate, type: .stopwatch)
         let timerData = try RestoreTimerContainer.getTimerData()
         let result = timerData.elapsedTimeAndStatus()
-        XCTAssertEqual(result.status, .running)
-        XCTAssertTrue(result.elapsedTime >= 0)
+        #expect(result.status == .running)
+        #expect(result.elapsedTime >= 0)
     }
 
-    func testElapsedTimeAndStatusReturnsPausedAndCorrectTime() throws {
+    @Test func elapsedTimeAndStatusReturnsPausedAndCorrectTime() async throws {
         let startDate = Date()
-        try RestoreTimerContainer.start(now: startDate, type: .stopwatch)
-        try RestoreTimerContainer.pause()
+        try await RestoreTimerContainer.start(now: startDate, type: .stopwatch)
+        try await RestoreTimerContainer.pause()
         let timerData = try RestoreTimerContainer.getTimerData()
         let result = timerData.elapsedTimeAndStatus()
-        XCTAssertEqual(result.status, .paused)
-        XCTAssertTrue(result.elapsedTime >= 0)
+        #expect(result.status == .paused)
+        #expect(result.elapsedTime >= 0)
     }
 
-    func testElapsedTimeAndStatusReturnsStoppedAndCorrectTime() throws {
+    @Test func elapsedTimeAndStatusReturnsStoppedAndCorrectTime() async throws {
         let startDate = Date()
-        try RestoreTimerContainer.start(now: startDate, type: .stopwatch)
-        try RestoreTimerContainer.finish()
-        XCTAssertThrowsError(try RestoreTimerContainer.getTimerData()) { error in
-            XCTAssertEqual(error as? PersistableTimerClientError, .timerHasNotStarted)
+        try await RestoreTimerContainer.start(now: startDate, type: .stopwatch)
+        try await RestoreTimerContainer.finish()
+        #expect { try RestoreTimerContainer.getTimerData() } throws: { error in
+            let persistableTimerClientError = try #require(error as? PersistableTimerClientError)
+            return persistableTimerClientError == .timerHasNotStarted
         }
     }
 
-    func testElapsedTimeAndStatusCalculatesCorrectElapsedTimeWhenRunning() throws {
+    @Test func elapsedTimeAndStatusCalculatesCorrectElapsedTimeWhenRunning() async throws {
         let startDate = Date()
-        try RestoreTimerContainer.start(now: startDate, type: .stopwatch)
+        try await RestoreTimerContainer.start(now: startDate, type: .stopwatch)
 
         let futureDate = startDate.addingTimeInterval(2)
 
         let timerData = try RestoreTimerContainer.getTimerData()
         let result = timerData.elapsedTimeAndStatus(now: futureDate)
 
-        XCTAssertEqual(result.status, .running)
-        XCTAssertEqual(result.elapsedTime, 2, accuracy: 0.1)
+        #expect(result.status == .running)
+        #expect(result.elapsedTime.ceilInt == 2)
     }
 
-    func testElapsedTimeAndStatusCalculatesCorrectElapsedTimeWhenPaused() throws {
+    @Test func elapsedTimeAndStatusCalculatesCorrectElapsedTimeWhenPaused() async throws {
         let startDate = Date()
-        try RestoreTimerContainer.start(now: startDate, type: .stopwatch)
+        try await RestoreTimerContainer.start(now: startDate, type: .stopwatch)
 
         let pauseDate = startDate.addingTimeInterval(1)
-        try RestoreTimerContainer.pause(now: pauseDate)
+        try await RestoreTimerContainer.pause(now: pauseDate)
 
         let futureDate = startDate.addingTimeInterval(3)
 
         let timerData = try RestoreTimerContainer.getTimerData()
         let result = timerData.elapsedTimeAndStatus(now: futureDate)
 
-        XCTAssertEqual(result.status, .paused)
-        XCTAssertEqual(result.elapsedTime, 1, accuracy: 0.1)
+        #expect(result.status == .paused)
+        #expect(result.elapsedTime.ceilInt == 1)
     }
 
-    func testElapsedTimeAndStatusCalculatesCorrectElapsedTimeWhenStopped() throws {
+    @Test func elapsedTimeAndStatusCalculatesCorrectElapsedTimeWhenStopped() async throws {
         let startDate = Date()
-        try RestoreTimerContainer.start(now: startDate, type: .timer(duration: 10))
+        try await RestoreTimerContainer.start(now: startDate, type: .timer(duration: 10))
 
         let stopDate = startDate.addingTimeInterval(2)
-        let timerData = try RestoreTimerContainer.finish(now: stopDate)
+        let timerData = try await RestoreTimerContainer.finish(now: stopDate)
         let futureDate = stopDate.addingTimeInterval(10)
         let result = timerData.elapsedTimeAndStatus(now: futureDate)
 
-        XCTAssertEqual(result.status, .finished)
-        XCTAssertEqual(result.elapsedTime, 2, accuracy: 0.1)
+        #expect(result.status == .finished)
+        #expect(result.elapsedTime.ceilInt == 2)
+    }
+}
+
+fileprivate extension TimeInterval {
+    var ceilInt: Int {
+        Int(ceil(self))
+    }
+
+    var floorInt: Int {
+        Int(floor(self))
     }
 }
