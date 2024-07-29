@@ -144,6 +144,7 @@ public final class PersistableTimer {
 
     /// Starts the timer if it's not already running.
     private func startTimerIfNeeded() {
+        timerType?.cancel()
         if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
             let timer = AsyncTimerSequence(interval: .seconds(updateInterval), clock: .continuous)
             self.timerType = .asyncTimerSequence(
