@@ -1,3 +1,4 @@
+import AsyncAlgorithms
 import Foundation
 import PersistableTimerCore
 
@@ -9,7 +10,7 @@ public final class PersistableTimer {
     }
 
     private var restoreTimerData: RestoreTimerData?
-    private var timer: Timer?
+    private var timerType: TimerType?
     private var stream = AsyncStream<TimerState>.makeStream()
     private let container: RestoreTimerContainer
     private let now: () -> Date
@@ -38,6 +39,10 @@ public final class PersistableTimer {
         container = RestoreTimerContainer(dataSource: dataSource)
         self.now = now
         self.updateInterval = updateInterval
+    }
+
+    deinit {
+        timerType?.cancel()
     }
 
     /// Retrieves the persisted timer data if available.
@@ -134,29 +139,59 @@ public final class PersistableTimer {
 
     /// Starts the timer if it's not already running.
     private func startTimerIfNeeded() {
-        let timer = Timer(fire: now(), interval: updateInterval, repeats: true) { [weak self] timer in
-            guard let self,
-                  let restoreTimerData = try? self.restoreTimerData ?? self.container.getTimerData()
-            else {
-                timer.invalidate()
-                return
+        if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
+            let timer = AsyncTimerSequence(interval: .seconds(updateInterval), clock: .continuous)
+            self.timerType = .asyncTimerSequence(
+                Task { [weak self] in
+                    for await _ in timer {
+                        self?.updateTimerStream()
+                    }
+                }
+            )
+        } else {
+            let timer = Timer(fire: now(), interval: updateInterval, repeats: true) { [weak self] timer in
+                self?.updateTimerStream()
             }
-            let timerState = restoreTimerData.elapsedTimeAndStatus(now: self.now())
-            self.stream.continuation.yield(timerState)
+            self.timerType = .timer(timer)
+            RunLoop.main.add(timer, forMode: .common)
         }
-        self.timer = timer
-        RunLoop.main.add(timer, forMode: .common)
     }
 
     /// Invalidates the current timer and optionally finishes the stream.
     ///
     /// - Parameter isFinish: A Boolean value indicating whether to finish the stream.
     private func invalidate(isFinish: Bool = false) {
-        timer?.invalidate()
-        timer = nil
+        timerType?.cancel()
+        timerType = nil
         if isFinish {
             stream.continuation.finish()
             stream = AsyncStream<TimerState>.makeStream()
+        }
+    }
+
+    private func updateTimerStream() {
+        guard let restoreTimerData = try? restoreTimerData ?? container.getTimerData()
+        else {
+            timerType?.cancel()
+            return
+        }
+        let timerState = restoreTimerData.elapsedTimeAndStatus(now: now())
+        stream.continuation.yield(timerState)
+    }
+}
+
+private extension PersistableTimer {
+    private enum TimerType {
+        case timer(Timer)
+        case asyncTimerSequence(Task<Void, Never>)
+
+        func cancel() {
+            switch self {
+            case .timer(let timer):
+                timer.invalidate()
+            case .asyncTimerSequence(let task):
+                task.cancel()
+            }
         }
     }
 }
