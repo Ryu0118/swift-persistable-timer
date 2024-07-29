@@ -66,8 +66,9 @@ public final class PersistableTimer {
     /// - Returns: The restored `RestoreTimerData`.
     @discardableResult
     public func restore() throws -> RestoreTimerData {
+        let now = now()
         let restoreTimerData = try container.getTimerData()
-        let timerState = restoreTimerData.elapsedTimeAndStatus(now: now())
+        let timerState = restoreTimerData.elapsedTimeAndStatus(now: now)
 
         self.stream.continuation.yield(timerState)
         if timerState.status == .running {
@@ -84,14 +85,15 @@ public final class PersistableTimer {
     ///   - forceStart: A Boolean value to force start the timer, ignoring if another timer is already running.
     /// - Throws: Any errors encountered while starting the timer.
     public func start(type: RestoreType, forceStart: Bool = false) async throws {
+        let now = now()
         let restoreTimerData = try await container.start(
-            now: now(),
+            now: now,
             type: type,
             forceStart: forceStart
         )
         self.restoreTimerData = restoreTimerData
 
-        stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now()))
+        stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now))
         startTimerIfNeeded()
     }
 
@@ -99,10 +101,11 @@ public final class PersistableTimer {
     ///
     /// - Throws: Any errors encountered while resuming the timer.
     public func resume() async throws {
-        let restoreTimerData = try await container.resume(now: now())
+        let now = now()
+        let restoreTimerData = try await container.resume(now: now)
         self.restoreTimerData = restoreTimerData
 
-        stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now()))
+        stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now))
         startTimerIfNeeded()
     }
 
@@ -110,10 +113,11 @@ public final class PersistableTimer {
     ///
     /// - Throws: Any errors encountered while pausing the timer.
     public func pause() async throws {
-        let restoreTimerData = try await container.pause(now: now())
+        let now = now()
+        let restoreTimerData = try await container.pause(now: now)
         self.restoreTimerData = restoreTimerData
 
-        stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now()))
+        stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now))
         invalidate()
     }
 
@@ -123,8 +127,9 @@ public final class PersistableTimer {
     /// - Throws: Any errors encountered while finishing the timer.
     public func finish(isResetTime: Bool = false) async throws {
         do {
-            let restoreTimerData = try await container.finish(now: now())
-            var elapsedTimeAndStatus = restoreTimerData.elapsedTimeAndStatus(now: now())
+            let now = now()
+            let restoreTimerData = try await container.finish(now: now)
+            var elapsedTimeAndStatus = restoreTimerData.elapsedTimeAndStatus(now: now)
             if isResetTime {
                 elapsedTimeAndStatus.elapsedTime = 0
             }
