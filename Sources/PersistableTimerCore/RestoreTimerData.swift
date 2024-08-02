@@ -145,9 +145,3 @@ public struct RestoreTimerData: Codable, Hashable {
         )
     }
 }
-
-fileprivate  extension Collection {
-    subscript(safe index: Index) -> Element? {
-        indices.contains(index) ? self[index] : nil
-    }
-}
