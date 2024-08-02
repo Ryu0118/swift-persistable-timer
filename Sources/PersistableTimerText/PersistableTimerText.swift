@@ -1,7 +1,7 @@
 import PersistableTimerCore
 import SwiftUI
 
-@available(iOS 16.0, *)
+@available(iOS 16.0, macOS 13.0, *)
 public extension Text {
     init(timerState: TimerState?, countsDown: Bool = true) {
         if let timerState, let pauseTime = timerState.pauseTime {
