@@ -1,13 +1,14 @@
 import SwiftUI
 import Observation
 import PersistableTimer
+import PersistableTimerText
 
 @Observable
 final class StopwatchModel {
     private let persistableTimer: PersistableTimer
 
-    var stopwatchText: String = "00:00:00"
     var timerState: TimerState?
+
     var buttonTitle: String {
         switch timerState?.status {
         case .running:
@@ -21,21 +22,13 @@ final class StopwatchModel {
         }
     }
 
-    var dateFormatter: DateComponentsFormatter = {
-        let dateFormatter = DateComponentsFormatter()
-        dateFormatter.unitsStyle = .positional
-        dateFormatter.zeroFormattingBehavior = .pad
-        dateFormatter.allowedUnits = [.hour, .minute, .second]
-        return dateFormatter
-    }()
-
     init(persistableTimer: PersistableTimer) {
         self.persistableTimer = persistableTimer
     }
 
     func buttonTapped() async {
         do {
-            switch timerState?.status {
+            let container = switch timerState?.status {
             case .running:
                 try await persistableTimer.pause()
             case .paused:
@@ -43,26 +36,18 @@ final class StopwatchModel {
             case .finished, nil:
                 try await persistableTimer.start(type: .stopwatch)
             }
+            self.timerState = container.elapsedTimeAndStatus()
         } catch {
             print(error)
         }
     }
 
     func synchronize() async {
-        do {
-            try persistableTimer.restore()
-        } catch {
-            print(error)
-        }
-
-        for await timerState in persistableTimer.timeStream {
-            stopwatchText = dateFormatter.string(from: timerState.time) ?? "00:00:00"
-            self.timerState = timerState
-        }
+        timerState = try? persistableTimer.getTimerData()?.elapsedTimeAndStatus()
     }
 
     func finish() async {
-        try? await persistableTimer.finish()
+        timerState = try? await persistableTimer.finish().elapsedTimeAndStatus()
     }
 }
 
@@ -71,8 +56,9 @@ struct StopwatchView: View {
 
     public var body: some View {
         VStack {
-            Text(stopwatchModel.stopwatchText)
+            Text(timerState: stopwatchModel.timerState)
                 .font(.title)
+
             Button {
                 Task {
                     await stopwatchModel.buttonTapped()

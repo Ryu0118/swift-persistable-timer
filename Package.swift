@@ -22,6 +22,10 @@ let package = Package(
         .library(
             name: "PersistableTimer",
             targets: ["PersistableTimer"]
+        ),
+        .library(
+            name: "PersistableTimerText",
+            targets: ["PersistableTimerText"]
         )
     ],
     dependencies: [
@@ -41,6 +45,10 @@ let package = Package(
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
             ],
             resources: [.copy("PrivacyInfo.xcprivacy")]
+        ),
+        .target(
+            name: "PersistableTimerText",
+            dependencies: ["PersistableTimerCore"]
         ),
         .testTarget(
             name: "PersistableTimerCoreTests",

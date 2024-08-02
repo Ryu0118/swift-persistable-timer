@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4225D7C02C5D4C3D00F932BC /* PersistableTimerText in Frameworks */ = {isa = PBXBuildFile; productRef = 4225D7BF2C5D4C3D00F932BC /* PersistableTimerText */; };
 		42A8519F2B6F95C700B94CA1 /* TimerTestApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A8519E2B6F95C700B94CA1 /* TimerTestApp.swift */; };
 		42A851A12B6F95C700B94CA1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A851A02B6F95C700B94CA1 /* ContentView.swift */; };
 		42A851A32B6F95C900B94CA1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 42A851A22B6F95C900B94CA1 /* Assets.xcassets */; };
@@ -34,6 +35,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4225D7C02C5D4C3D00F932BC /* PersistableTimerText in Frameworks */,
 				42A851AF2B6F960A00B94CA1 /* PersistableTimer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -107,6 +109,7 @@
 			name = TimerTest;
 			packageProductDependencies = (
 				42A851AE2B6F960A00B94CA1 /* PersistableTimer */,
+				4225D7BF2C5D4C3D00F932BC /* PersistableTimerText */,
 			);
 			productName = TimerTest;
 			productReference = 42A8519B2B6F95C700B94CA1 /* TimerTest.app */;
@@ -374,6 +377,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		4225D7BF2C5D4C3D00F932BC /* PersistableTimerText */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PersistableTimerText;
+		};
 		42A851AE2B6F960A00B94CA1 /* PersistableTimer */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PersistableTimer;

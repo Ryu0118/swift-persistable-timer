@@ -20,9 +20,11 @@ public struct PausePeriod: Codable, Hashable {
 
 /// Represents the state of a timer, including elapsed time and status.
 public struct TimerState: Codable, Hashable {
+    public let startDate: Date
     public var elapsedTime: TimeInterval
     public var status: TimerStatus
     public var type: RestoreType
+    public var pausePeriods: [PausePeriod]
 
     public var time: TimeInterval {
         switch type {
@@ -33,10 +35,59 @@ public struct TimerState: Codable, Hashable {
         }
     }
 
-    public init(elapsedTime: TimeInterval, status: TimerStatus, type: RestoreType) {
+    /// Calculates the display date for the timer or stopwatch.
+    /// - Returns: The `Date` to be displayed in the `Text` view.
+    public var displayDate: Date {
+        switch type {
+        case .stopwatch:
+            Date(timeIntervalSinceNow: -elapsedTime)
+        case let .timer(duration):
+            Date(timeIntervalSinceNow: duration - elapsedTime)
+        }
+    }
+
+    package var timerInterval: ClosedRange<Date> {
+        switch type {
+        case .stopwatch:
+            if let pausePeriod = pausePeriods.last {
+                pausePeriod.pause.addingTimeInterval(-elapsedTime) ... pausePeriod.pause.addingTimeInterval(-elapsedTime)
+            } else {
+                startDate ... startDate
+            }
+        case .timer(let duration):
+            startDate ... startDate.addingTimeInterval(duration - elapsedTime)
+        }
+    }
+
+    package var pauseTime: Date? {
+        switch type {
+        case .stopwatch:
+            if let pausePeriod = pausePeriods.last, pausePeriod.start == nil {
+                pausePeriod.pause
+            } else {
+                nil
+            }
+        case .timer(let duration):
+            if let pausePeriod = pausePeriods.last, pausePeriod.start == nil {
+                startDate.addingTimeInterval(duration - elapsedTime)
+            } else {
+                nil
+            }
+        }
+    }
+
+    public init(
+        startDate: Date,
+        elapsedTime: TimeInterval,
+        status: TimerStatus,
+        type: RestoreType,
+        pausePeriods: [PausePeriod]
+    ) {
+        self.startDate = startDate
         self.elapsedTime = elapsedTime
         self.status = status
         self.type = type
+        self.pausePeriods = pausePeriods
     }
 }
 
@@ -86,9 +137,17 @@ public struct RestoreTimerData: Codable, Hashable {
         }
 
         return TimerState(
+            startDate: startDate,
             elapsedTime: max(elapsedTime, 0),
             status: status,
-            type: type
+            type: type,
+            pausePeriods: pausePeriods
         )
+    }
+}
+
+fileprivate  extension Collection {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

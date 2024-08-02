@@ -84,7 +84,8 @@ public final class PersistableTimer {
     ///   - type: The type of timer, either stopwatch or countdown.
     ///   - forceStart: A Boolean value to force start the timer, ignoring if another timer is already running.
     /// - Throws: Any errors encountered while starting the timer.
-    public func start(type: RestoreType, forceStart: Bool = false) async throws {
+    @discardableResult
+    public func start(type: RestoreType, forceStart: Bool = false) async throws -> RestoreTimerData {
         let now = now()
         let restoreTimerData = try await container.start(
             now: now,
@@ -95,37 +96,46 @@ public final class PersistableTimer {
 
         stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now))
         startTimerIfNeeded()
+
+        return restoreTimerData
     }
 
     /// Resumes a paused timer.
     ///
     /// - Throws: Any errors encountered while resuming the timer.
-    public func resume() async throws {
+    @discardableResult
+    public func resume() async throws -> RestoreTimerData {
         let now = now()
         let restoreTimerData = try await container.resume(now: now)
         self.restoreTimerData = restoreTimerData
 
         stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now))
         startTimerIfNeeded()
+
+        return restoreTimerData
     }
 
     /// Pauses the currently running timer.
     ///
     /// - Throws: Any errors encountered while pausing the timer.
-    public func pause() async throws {
+    @discardableResult
+    public func pause() async throws -> RestoreTimerData {
         let now = now()
         let restoreTimerData = try await container.pause(now: now)
         self.restoreTimerData = restoreTimerData
 
         stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now))
         invalidate()
+
+        return restoreTimerData
     }
 
     /// Finishes the timer and optionally resets the elapsed time.
     ///
     /// - Parameter isResetTime: A Boolean value indicating whether to reset the elapsed time upon finishing.
     /// - Throws: Any errors encountered while finishing the timer.
-    public func finish(isResetTime: Bool = false) async throws {
+    @discardableResult
+    public func finish(isResetTime: Bool = false) async throws -> RestoreTimerData {
         do {
             let now = now()
             let restoreTimerData = try await container.finish(now: now)
@@ -136,6 +146,8 @@ public final class PersistableTimer {
             self.restoreTimerData = restoreTimerData
             stream.continuation.yield(elapsedTimeAndStatus)
             invalidate(isFinish: true)
+
+            return restoreTimerData
         } catch {
             invalidate(isFinish: true)
             throw error

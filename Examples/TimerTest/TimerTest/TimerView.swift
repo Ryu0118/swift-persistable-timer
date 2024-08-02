@@ -1,12 +1,13 @@
 import SwiftUI
 import Observation
 import PersistableTimer
+import PersistableTimerText
 
 @Observable
 final class TimerModel {
     private let persistableTimer: PersistableTimer
-    var timerText: String?
     var timerState: TimerState?
+
     var selectedHours: Int = 0
     var selectedMinutes: Int = 0
     var selectedSeconds: Int = 0
@@ -28,21 +29,13 @@ final class TimerModel {
         }
     }
 
-    var dateFormatter: DateComponentsFormatter = {
-        let dateFormatter = DateComponentsFormatter()
-        dateFormatter.unitsStyle = .positional
-        dateFormatter.zeroFormattingBehavior = .pad
-        dateFormatter.allowedUnits = [.hour, .minute, .second]
-        return dateFormatter
-    }()
-
     init(persistableTimer: PersistableTimer) {
         self.persistableTimer = persistableTimer
     }
 
     func buttonTapped() async {
         do {
-            switch timerState?.status {
+            let container = switch timerState?.status {
             case .running:
                 try await persistableTimer.pause()
             case .paused:
@@ -54,30 +47,18 @@ final class TimerModel {
                     )
                 )
             }
+            self.timerState = container.elapsedTimeAndStatus()
         } catch {
             print(error)
         }
     }
 
     func synchronize() async {
-        do {
-            try persistableTimer.restore()
-        } catch {
-            print(error)
-        }
-
-        for await timerState in persistableTimer.timeStream {
-            var timerText = dateFormatter.string(from: timerState.time) ?? "00:00:00"
-            if timerState.time < 0 {
-                timerText = "+" + timerText
-            }
-            self.timerText = timerText
-            self.timerState = timerState
-        }
+        timerState = try? persistableTimer.getTimerData()?.elapsedTimeAndStatus()
     }
 
     func finish() async {
-        try? await persistableTimer.finish()
+        timerState = try? await persistableTimer.finish().elapsedTimeAndStatus()
     }
 }
 
@@ -86,8 +67,8 @@ struct TimerView: View {
 
     var body: some View {
         VStack {
-            if let timerText = timerModel.timerText {
-                Text(timerText)
+            if let timerState = timerModel.timerState {
+                Text(timerState: timerState)
                     .font(.title)
             } else {
                 TimePicker(
