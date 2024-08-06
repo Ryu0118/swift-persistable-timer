@@ -66,6 +66,8 @@ public final class PersistableTimer {
     /// - Returns: The restored `RestoreTimerData`.
     @discardableResult
     public func restore() throws -> RestoreTimerData {
+        stream = AsyncStream<TimerState>.makeStream()
+
         let now = now()
         let restoreTimerData = try container.getTimerData()
         let timerState = restoreTimerData.elapsedTimeAndStatus(now: now)
