@@ -1,14 +1,14 @@
 import Foundation
 
 /// Represents the status of a timer.
-public enum TimerStatus: Codable, Hashable {
+public enum TimerStatus: Sendable, Codable, Hashable {
     case running
     case paused
     case finished
 }
 
 /// Represents a period during which the timer is paused.
-public struct PausePeriod: Codable, Hashable {
+public struct PausePeriod: Sendable, Codable, Hashable {
     public var pause: Date
     public var start: Date?
 
@@ -19,7 +19,7 @@ public struct PausePeriod: Codable, Hashable {
 }
 
 /// Represents the state of a timer, including elapsed time and status.
-public struct TimerState: Codable, Hashable {
+public struct TimerState: Sendable, Codable, Hashable {
     public let startDate: Date
     public var elapsedTime: TimeInterval
     public var status: TimerStatus
@@ -92,13 +92,13 @@ public struct TimerState: Codable, Hashable {
 }
 
 /// Represents the type of restoration for a timer, either a stopwatch or a countdown timer.
-public enum RestoreType: Codable, Hashable {
+public enum RestoreType: Codable, Hashable, Sendable {
     case stopwatch
     case timer(duration: TimeInterval)
 }
 
 /// Represents the data required to restore a timer's state.
-public struct RestoreTimerData: Codable, Hashable {
+public struct RestoreTimerData: Codable, Hashable, Sendable {
     public var startDate: Date
     public var pausePeriods: [PausePeriod]
     public var type: RestoreType

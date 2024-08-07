@@ -124,7 +124,7 @@ public struct RestoreTimerContainer {
 }
 
 /// Errors specific to the PersistableTimerClient.
-public enum PersistableTimerClientError: Error {
+public enum PersistableTimerClientError: Error, Sendable {
     case timerHasNotStarted
     case timerHasNotPaused
     case timerAlreadyPaused
