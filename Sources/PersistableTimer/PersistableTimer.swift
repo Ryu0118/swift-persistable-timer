@@ -17,6 +17,7 @@ public final class PersistableTimer {
 
     /// The interval at which the timer updates its elapsed time.
     let updateInterval: TimeInterval
+    let useFoundationTimer: Bool
 
     /// Initializes a new PersistableTimer.
     ///
@@ -27,6 +28,7 @@ public final class PersistableTimer {
     public init(
         dataSourceType: DataSourceType,
         updateInterval: TimeInterval = 1,
+        useFoundationTimer: Bool = false,
         now: @escaping () -> Date = { Date() }
     ) {
         let dataSource: any DataSource =
@@ -39,6 +41,7 @@ public final class PersistableTimer {
         container = RestoreTimerContainer(dataSource: dataSource)
         self.now = now
         self.updateInterval = updateInterval
+        self.useFoundationTimer = useFoundationTimer
     }
 
     deinit {
@@ -159,7 +162,7 @@ public final class PersistableTimer {
     /// Starts the timer if it's not already running.
     private func startTimerIfNeeded() {
         timerType?.cancel()
-        if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
+        if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *), !useFoundationTimer {
             let timer = AsyncTimerSequence(interval: .seconds(updateInterval), clock: .continuous)
             self.timerType = .asyncTimerSequence(
                 Task { [weak self] in
