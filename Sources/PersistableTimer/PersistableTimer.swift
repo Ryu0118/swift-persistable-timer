@@ -172,8 +172,7 @@ public final class PersistableTimer {
         guard shouldEmitTimeStream else {
             return
         }
-
-        timerType?.cancel()
+        invalidate(isFinish: true)
         if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *), !useFoundationTimer {
             self.timerType = .asyncTimerSequence(
                 Task { [weak self] in
