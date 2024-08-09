@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		4225D7C02C5D4C3D00F932BC /* PersistableTimerText in Frameworks */ = {isa = PBXBuildFile; productRef = 4225D7BF2C5D4C3D00F932BC /* PersistableTimerText */; };
+		4252439E2C66137400981D2F /* MultipleStopwatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4252439D2C66137400981D2F /* MultipleStopwatchView.swift */; };
+		425243A12C661BCB00981D2F /* UserDefaultsEditor in Frameworks */ = {isa = PBXBuildFile; productRef = 425243A02C661BCB00981D2F /* UserDefaultsEditor */; };
 		42A8519F2B6F95C700B94CA1 /* TimerTestApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A8519E2B6F95C700B94CA1 /* TimerTestApp.swift */; };
 		42A851A12B6F95C700B94CA1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A851A02B6F95C700B94CA1 /* ContentView.swift */; };
 		42A851A32B6F95C900B94CA1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 42A851A22B6F95C900B94CA1 /* Assets.xcassets */; };
@@ -19,6 +21,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		4252439D2C66137400981D2F /* MultipleStopwatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipleStopwatchView.swift; sourceTree = "<group>"; };
 		42A8519B2B6F95C700B94CA1 /* TimerTest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TimerTest.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		42A8519E2B6F95C700B94CA1 /* TimerTestApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerTestApp.swift; sourceTree = "<group>"; };
 		42A851A02B6F95C700B94CA1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -37,6 +40,7 @@
 			files = (
 				4225D7C02C5D4C3D00F932BC /* PersistableTimerText in Frameworks */,
 				42A851AF2B6F960A00B94CA1 /* PersistableTimer in Frameworks */,
+				425243A12C661BCB00981D2F /* UserDefaultsEditor in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -67,6 +71,7 @@
 				42A8519E2B6F95C700B94CA1 /* TimerTestApp.swift */,
 				42A851B22B6FAAB900B94CA1 /* StopwatchView.swift */,
 				42A851B02B6FAAAC00B94CA1 /* TimerView.swift */,
+				4252439D2C66137400981D2F /* MultipleStopwatchView.swift */,
 				42A851A02B6F95C700B94CA1 /* ContentView.swift */,
 				42A8519C2B6F95C700B94CA1 /* Products */,
 				42A851A22B6F95C900B94CA1 /* Assets.xcassets */,
@@ -110,6 +115,7 @@
 			packageProductDependencies = (
 				42A851AE2B6F960A00B94CA1 /* PersistableTimer */,
 				4225D7BF2C5D4C3D00F932BC /* PersistableTimerText */,
+				425243A02C661BCB00981D2F /* UserDefaultsEditor */,
 			);
 			productName = TimerTest;
 			productReference = 42A8519B2B6F95C700B94CA1 /* TimerTest.app */;
@@ -139,6 +145,9 @@
 				Base,
 			);
 			mainGroup = 42A851922B6F95C600B94CA1;
+			packageReferences = (
+				4252439F2C661BCB00981D2F /* XCRemoteSwiftPackageReference "UserDefaultsEditor" */,
+			);
 			productRefGroup = 42A8519C2B6F95C700B94CA1 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -167,6 +176,7 @@
 			files = (
 				42A851B12B6FAAAC00B94CA1 /* TimerView.swift in Sources */,
 				42A851A12B6F95C700B94CA1 /* ContentView.swift in Sources */,
+				4252439E2C66137400981D2F /* MultipleStopwatchView.swift in Sources */,
 				42A851B32B6FAAB900B94CA1 /* StopwatchView.swift in Sources */,
 				42A8519F2B6F95C700B94CA1 /* TimerTestApp.swift in Sources */,
 				42A851B52B6FB0CE00B94CA1 /* TimePicker.swift in Sources */,
@@ -376,10 +386,26 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		4252439F2C661BCB00981D2F /* XCRemoteSwiftPackageReference "UserDefaultsEditor" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Ryu0118/UserDefaultsEditor";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.4.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		4225D7BF2C5D4C3D00F932BC /* PersistableTimerText */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PersistableTimerText;
+		};
+		425243A02C661BCB00981D2F /* UserDefaultsEditor */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4252439F2C661BCB00981D2F /* XCRemoteSwiftPackageReference "UserDefaultsEditor" */;
+			productName = UserDefaultsEditor;
 		};
 		42A851AE2B6F960A00B94CA1 /* PersistableTimer */ = {
 			isa = XCSwiftPackageProductDependency;
