@@ -1,6 +1,15 @@
 {
   "pins" : [
     {
+      "identity" : "editvalueview",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/p-x9/EditValueView.git",
+      "state" : {
+        "revision" : "454d77987aea7a3673dc2b7ce8ab15efa154987f",
+        "version" : "0.7.0"
+      }
+    },
+    {
       "identity" : "swift-async-algorithms",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-async-algorithms.git",
@@ -19,6 +28,15 @@
       }
     },
     {
+      "identity" : "swift-magic-mirror",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/p-x9/swift-magic-mirror.git",
+      "state" : {
+        "revision" : "390e248dd6727e17aeb3949c12bb83e6eac876d1",
+        "version" : "0.2.0"
+      }
+    },
+    {
       "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-syntax.git",
@@ -34,6 +52,33 @@
       "state" : {
         "revision" : "69d59cfc76e5daf498ca61f5af409f594768eef9",
         "version" : "0.10.0"
+      }
+    },
+    {
+      "identity" : "swiftui-reflection-view",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/p-x9/swiftui-reflection-view.git",
+      "state" : {
+        "revision" : "d4cef50ab1a3ea729df02807ad1c1698a5d646da",
+        "version" : "0.8.1"
+      }
+    },
+    {
+      "identity" : "swiftuicolor",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/p-x9/SwiftUIColor.git",
+      "state" : {
+        "revision" : "126ae1f4fdd8cde2b49359707f175b12104176f9",
+        "version" : "0.5.0"
+      }
+    },
+    {
+      "identity" : "userdefaultseditor",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Ryu0118/UserDefaultsEditor",
+      "state" : {
+        "revision" : "b06a32bdd5dbb27fda6e095af913743cd2c14a3d",
+        "version" : "0.4.0"
       }
     }
   ],

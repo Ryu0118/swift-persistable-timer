@@ -6,6 +6,7 @@ import Observation
 final class ContentModel {
     var isTimerPresented = false
     var isStopwatchPresented = false
+    var isMultipleStopwatchPresented = false
     let persistableTimer: PersistableTimer
 
     init(persistableTimer: PersistableTimer) {
@@ -37,6 +38,10 @@ struct ContentView: View {
                 .onTapGesture {
                     contentModel.isStopwatchPresented = true
                 }
+            Text("Multiple Stopwatch")
+                .onTapGesture {
+                    contentModel.isMultipleStopwatchPresented = true
+                }
         }
         .sheet(isPresented: $contentModel.isTimerPresented) {
             TimerView(
@@ -50,6 +55,11 @@ struct ContentView: View {
                 stopwatchModel: StopwatchModel(
                     persistableTimer: contentModel.persistableTimer
                 )
+            )
+        }
+        .sheet(isPresented: $contentModel.isMultipleStopwatchPresented) {
+            MultipleStopwatchView(
+                stopwatchModel: MultipleStopwatchModel()
             )
         }
         .onAppear {

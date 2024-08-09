@@ -6,7 +6,10 @@ import PersistableTimerCore
 public final class PersistableTimer {
     /// An async stream of timer states, providing continuous updates.
     public var timeStream: AsyncStream<TimerState> {
-        stream.stream
+        if !shouldEmitTimeStream {
+            assertionFailure("Attempted to access timeStream while shouldEmitTimeStream is set to false.")
+        }
+        return stream.stream
     }
 
     private var restoreTimerData: RestoreTimerData?
@@ -18,6 +21,8 @@ public final class PersistableTimer {
     /// The interval at which the timer updates its elapsed time.
     let updateInterval: TimeInterval
     let useFoundationTimer: Bool
+    let shouldEmitTimeStream: Bool
+    let id: String?
 
     /// Initializes a new PersistableTimer.
     ///
@@ -26,7 +31,9 @@ public final class PersistableTimer {
     ///   - updateInterval: The interval at which the timer updates, defaults to 1 second.
     ///   - now: A closure providing the current date and time, defaults to `Date()`.
     public init(
+        id: String? = nil,
         dataSourceType: DataSourceType,
+        shouldEmitTimeStream: Bool = true,
         updateInterval: TimeInterval = 1,
         useFoundationTimer: Bool = false,
         now: @escaping () -> Date = { Date() }
@@ -39,9 +46,11 @@ public final class PersistableTimer {
                 UserDefaultsClient(userDefaults: userDefaults)
             }
         container = RestoreTimerContainer(dataSource: dataSource)
+        self.id = id
         self.now = now
         self.updateInterval = updateInterval
         self.useFoundationTimer = useFoundationTimer
+        self.shouldEmitTimeStream = shouldEmitTimeStream
     }
 
     deinit {
@@ -53,14 +62,14 @@ public final class PersistableTimer {
     /// - Throws: Any errors encountered while fetching the timer data.
     /// - Returns: The `RestoreTimerData` if available.
     public func getTimerData() throws -> RestoreTimerData? {
-        try container.getTimerData()
+        try container.getTimerData(id: id)
     }
 
     /// Checks if a timer is currently running.
     ///
     /// - Returns: A Boolean value indicating whether a timer is running.
     public func isTimerRunning() -> Bool {
-        container.isTimerRunning()
+        container.isTimerRunning(id: id)
     }
 
     /// Restores the timer from the last known state and starts the timer if it was running.
@@ -69,13 +78,11 @@ public final class PersistableTimer {
     /// - Returns: The restored `RestoreTimerData`.
     @discardableResult
     public func restore() throws -> RestoreTimerData {
-        stream = AsyncStream<TimerState>.makeStream()
-
         let now = now()
-        let restoreTimerData = try container.getTimerData()
+        let restoreTimerData = try container.getTimerData(id: id)
         let timerState = restoreTimerData.elapsedTimeAndStatus(now: now)
 
-        self.stream.continuation.yield(timerState)
+        self.stream.continuation.yieldIfNeeded(timerState, enable: shouldEmitTimeStream)
         if timerState.status == .running {
             startTimerIfNeeded()
         }
@@ -93,13 +100,14 @@ public final class PersistableTimer {
     public func start(type: RestoreType, forceStart: Bool = false) async throws -> RestoreTimerData {
         let now = now()
         let restoreTimerData = try await container.start(
+            id: id,
             now: now,
             type: type,
             forceStart: forceStart
         )
         self.restoreTimerData = restoreTimerData
 
-        stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now))
+        stream.continuation.yieldIfNeeded(restoreTimerData.elapsedTimeAndStatus(now: now), enable: shouldEmitTimeStream)
         startTimerIfNeeded()
 
         return restoreTimerData
@@ -111,10 +119,10 @@ public final class PersistableTimer {
     @discardableResult
     public func resume() async throws -> RestoreTimerData {
         let now = now()
-        let restoreTimerData = try await container.resume(now: now)
+        let restoreTimerData = try await container.resume(id: id, now: now)
         self.restoreTimerData = restoreTimerData
 
-        stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now))
+        stream.continuation.yieldIfNeeded(restoreTimerData.elapsedTimeAndStatus(now: now), enable: shouldEmitTimeStream)
         startTimerIfNeeded()
 
         return restoreTimerData
@@ -126,10 +134,10 @@ public final class PersistableTimer {
     @discardableResult
     public func pause() async throws -> RestoreTimerData {
         let now = now()
-        let restoreTimerData = try await container.pause(now: now)
+        let restoreTimerData = try await container.pause(id: id, now: now)
         self.restoreTimerData = restoreTimerData
 
-        stream.continuation.yield(restoreTimerData.elapsedTimeAndStatus(now: now))
+        stream.continuation.yieldIfNeeded(restoreTimerData.elapsedTimeAndStatus(now: now), enable: shouldEmitTimeStream)
         invalidate()
 
         return restoreTimerData
@@ -143,13 +151,13 @@ public final class PersistableTimer {
     public func finish(isResetTime: Bool = false) async throws -> RestoreTimerData {
         do {
             let now = now()
-            let restoreTimerData = try await container.finish(now: now)
+            let restoreTimerData = try await container.finish(id: id, now: now)
             var elapsedTimeAndStatus = restoreTimerData.elapsedTimeAndStatus(now: now)
             if isResetTime {
                 elapsedTimeAndStatus.elapsedTime = 0
             }
             self.restoreTimerData = restoreTimerData
-            stream.continuation.yield(elapsedTimeAndStatus)
+            stream.continuation.yieldIfNeeded(elapsedTimeAndStatus, enable: shouldEmitTimeStream)
             invalidate(isFinish: true)
 
             return restoreTimerData
@@ -161,11 +169,15 @@ public final class PersistableTimer {
 
     /// Starts the timer if it's not already running.
     private func startTimerIfNeeded() {
+        guard shouldEmitTimeStream else {
+            return
+        }
+
         timerType?.cancel()
         if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *), !useFoundationTimer {
-            let timer = AsyncTimerSequence(interval: .seconds(updateInterval), clock: .continuous)
             self.timerType = .asyncTimerSequence(
                 Task { [weak self] in
+                    let timer = AsyncTimerSequence(interval: .seconds(self?.updateInterval ?? 1), clock: .continuous)
                     for await _ in timer {
                         self?.updateTimerStream()
                     }
@@ -186,20 +198,20 @@ public final class PersistableTimer {
     private func invalidate(isFinish: Bool = false) {
         timerType?.cancel()
         timerType = nil
-        if isFinish {
+        if isFinish && shouldEmitTimeStream {
             stream.continuation.finish()
             stream = AsyncStream<TimerState>.makeStream()
         }
     }
 
     private func updateTimerStream() {
-        guard let restoreTimerData = try? restoreTimerData ?? container.getTimerData()
+        guard let restoreTimerData = try? restoreTimerData ?? container.getTimerData(id: id)
         else {
             timerType?.cancel()
             return
         }
         let timerState = restoreTimerData.elapsedTimeAndStatus(now: now())
-        stream.continuation.yield(timerState)
+        stream.continuation.yieldIfNeeded(timerState, enable: shouldEmitTimeStream)
     }
 }
 
@@ -215,6 +227,17 @@ private extension PersistableTimer {
             case .asyncTimerSequence(let task):
                 task.cancel()
             }
+        }
+    }
+}
+
+extension AsyncStream.Continuation {
+    @discardableResult
+    func yieldIfNeeded(_ value: Element, enable: Bool) -> AsyncStream<Element>.Continuation.YieldResult? {
+        if enable {
+            return yield(value)
+        } else {
+            return nil
         }
     }
 }

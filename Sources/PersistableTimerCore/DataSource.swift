@@ -13,6 +13,8 @@ package protocol DataSource {
     ) async throws
 
     func set(_ value: Any?, forKey: String) async
+
+    func keys() -> [String]
 }
 
 /// An enum representing the type of data source to be used.
@@ -24,6 +26,8 @@ public enum DataSourceType {
 /// A client for interacting with UserDefaults as a data source.
 package struct UserDefaultsClient: DataSource {
     private let userDefaults: UserDefaults
+    private let decoder = JSONDecoder()
+    private let encoder = JSONEncoder()
 
     package init(userDefaults: UserDefaults) {
         self.userDefaults = userDefaults
@@ -34,7 +38,6 @@ package struct UserDefaultsClient: DataSource {
         type: T.Type
     ) -> T? {
         if let data = userDefaults.object(forKey: forKey) as? Data {
-            let decoder = JSONDecoder()
             do {
                 return try decoder.decode(type, from: data)
             } catch {
@@ -48,13 +51,16 @@ package struct UserDefaultsClient: DataSource {
         _ value: some Encodable,
         forKey: String
     ) async throws {
-        let encoder = JSONEncoder()
         let data = try encoder.encode(value)
         userDefaults.set(data, forKey: forKey)
     }
 
     package func set(_ value: Any?, forKey: String) async {
         userDefaults.set(value, forKey: forKey)
+    }
+
+    package func keys() -> [String] {
+        Array(userDefaults.dictionaryRepresentation().keys)
     }
 }
 
@@ -84,5 +90,9 @@ package final class InMemoryDataSource: DataSource {
 
     package func set(_ value: Any?, forKey: String) async {
         dataStore[forKey] = value as? Data
+    }
+
+    package func keys() -> [String] {
+        Array(dataStore.keys)
     }
 }
