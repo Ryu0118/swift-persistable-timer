@@ -49,11 +49,11 @@ public struct TimerState: Sendable, Codable, Hashable {
     package var timerInterval: ClosedRange<Date> {
         switch type {
         case .stopwatch:
-            if pausePeriods.last != nil {
+            if let lastPausePeriod = pausePeriods.last {
                 if #available(iOS 18, macCatalyst 18, macOS 18, tvOS 18, visionOS 2, watchOS 11, *) {
-                    Date().addingTimeInterval(-elapsedTime + 1) ... Date()
+                    lastPausePeriod.pause.addingTimeInterval(-elapsedTime + 1) ... lastPausePeriod.pause
                 } else {
-                    Date().addingTimeInterval(-elapsedTime) ... Date()
+                    lastPausePeriod.pause.addingTimeInterval(-elapsedTime) ... lastPausePeriod.pause
                 }
             } else {
                 startDate ... startDate

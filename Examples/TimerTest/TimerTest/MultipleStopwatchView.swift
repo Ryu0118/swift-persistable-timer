@@ -98,6 +98,7 @@ final class MultipleStopwatchModel {
 
 struct MultipleStopwatchView: View {
     @Bindable var stopwatchModel: MultipleStopwatchModel
+    @State var id = UUID()
 
     public var body: some View {
         VStack(spacing: 20) {
@@ -106,11 +107,18 @@ struct MultipleStopwatchView: View {
                 timerView(timer: \.timer2)
                 timerView(timer: \.timer3)
             }
+            .id(id)
             Button("Present UserDefaultsEditor") {
                 stopwatchModel.isUDEditorPresented = true
             }
+            Button("Update View forcefully") {
+                id = UUID()
+            }
         }
         .task {
+            await stopwatchModel.synchronize()
+        }
+        .task(id: id) {
             await stopwatchModel.synchronize()
         }
         .onDisappear {
