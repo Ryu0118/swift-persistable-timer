@@ -118,6 +118,9 @@ struct MultipleStopwatchView: View {
         .task {
             await stopwatchModel.synchronize()
         }
+        .task(id: id) {
+            await stopwatchModel.synchronize()
+        }
         .onDisappear {
             Task {
                 await stopwatchModel.finish()
