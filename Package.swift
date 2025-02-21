@@ -40,9 +40,6 @@ let package = Package(
             name: "PersistableTimerCore",
             dependencies: [
                 .product(name: "ConcurrencyExtras", package: "swift-concurrency-extras")
-            ],
-            swiftSettings: [
-                .swiftLanguageMode(.v6)
             ]
         ),
         .target(
@@ -51,17 +48,11 @@ let package = Package(
                 "PersistableTimerCore",
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
             ],
-            resources: [.copy("PrivacyInfo.xcprivacy")],
-            swiftSettings: [
-                .swiftLanguageMode(.v6)
-            ]
+            resources: [.copy("PrivacyInfo.xcprivacy")]
         ),
         .target(
             name: "PersistableTimerText",
-            dependencies: ["PersistableTimerCore"],
-            swiftSettings: [
-                .swiftLanguageMode(.v6)
-            ]
+            dependencies: ["PersistableTimerCore"]
         ),
         .testTarget(
             name: "PersistableTimerCoreTests",
