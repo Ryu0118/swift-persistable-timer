@@ -1,18 +1,22 @@
 import Foundation
+import ConcurrencyExtras
 
 /// A protocol defining the requirements for a data source.
-package protocol DataSource {
+package protocol DataSource: Sendable {
     func data<T: Decodable>(
         forKey: String,
         type: T.Type
     ) -> T?
 
-    func set(
-        _ value: some Encodable,
+    func set<T: Encodable>(
+        _ value: T,
         forKey: String
     ) async throws
 
-    func set(_ value: Any?, forKey: String) async
+    func setNil(
+        forKey: String
+    ) async
+
 
     func keys() -> [String]
 }
@@ -24,8 +28,9 @@ public enum DataSourceType {
 }
 
 /// A client for interacting with UserDefaults as a data source.
-package struct UserDefaultsClient: DataSource {
-    private let userDefaults: UserDefaults
+package struct UserDefaultsClient: Sendable, DataSource {
+    nonisolated(unsafe) private let userDefaults: UserDefaults
+
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
 
@@ -47,16 +52,16 @@ package struct UserDefaultsClient: DataSource {
         return nil
     }
 
-    package func set(
-        _ value: some Encodable,
+    package func set<T: Encodable>(
+        _ value: T,
         forKey: String
     ) async throws {
         let data = try encoder.encode(value)
         userDefaults.set(data, forKey: forKey)
     }
 
-    package func set(_ value: Any?, forKey: String) async {
-        userDefaults.set(value, forKey: forKey)
+    package func setNil(forKey: String) async {
+        userDefaults.set(nil, forKey: forKey)
     }
 
     package func keys() -> [String] {
@@ -65,8 +70,11 @@ package struct UserDefaultsClient: DataSource {
 }
 
 /// A client for managing data in memory, mainly for testing purposes.
-package final class InMemoryDataSource: DataSource {
-    var dataStore: [String: Data] = [:]
+package final class InMemoryDataSource: Sendable, DataSource {
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    let dataStore: LockIsolated<[String: Data]> = .init([:])
 
     package init() {}
 
@@ -75,21 +83,23 @@ package final class InMemoryDataSource: DataSource {
         type: T.Type
     ) -> T? where T : Decodable {
         guard let data = dataStore[forKey] else { return nil }
-        let decoder = JSONDecoder()
         return try? decoder.decode(type, from: data)
     }
 
-    package func set(
-        _ value: some Encodable,
+    package func set<T: Encodable>(
+        _ value: T,
         forKey: String
     ) async throws {
-        let encoder = JSONEncoder()
         let data = try encoder.encode(value)
-        dataStore[forKey] = data
+        dataStore.withValue {
+            $0[forKey] = data
+        }
     }
 
-    package func set(_ value: Any?, forKey: String) async {
-        dataStore[forKey] = value as? Data
+    package func setNil(forKey: String) async {
+        dataStore.withValue {
+            $0[forKey] = nil
+        }
     }
 
     package func keys() -> [String] {

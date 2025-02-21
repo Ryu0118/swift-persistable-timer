@@ -2,7 +2,7 @@ import Foundation
 
 /// A container for managing and persisting timer data.
 /// Supports handling multiple timers using unique identifiers.
-public struct RestoreTimerContainer {
+public struct RestoreTimerContainer: Sendable {
     /// A constant structure for defining keys used in data persistence.
     private enum Const {
         static let persistableTimerKey = "persistableTimerKey"
@@ -137,7 +137,7 @@ public struct RestoreTimerContainer {
     public func finish(id: String? = nil, now: Date = Date()) async throws -> RestoreTimerData {
         var restoreTimerData = try getTimerData(id: id)
         restoreTimerData.stopDate = now
-        await dataSource.set(nil, forKey: Const.persistableTimerKey(id: id))
+        await dataSource.setNil(forKey: Const.persistableTimerKey(id: id))
         return restoreTimerData
     }
 
@@ -157,9 +157,9 @@ public struct RestoreTimerContainer {
                     if let id = key.components(separatedBy: "_").last,
                        id != Const.persistableTimerKey
                     {
-                        return (id, try await finish(id: id, now: now))
+                        return (id, try await self.finish(id: id, now: now))
                     } else {
-                        return (nil, try await finish(now: now))
+                        return (nil, try await self.finish(now: now))
                     }
                 }
             }
