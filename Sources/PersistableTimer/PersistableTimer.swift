@@ -1,9 +1,10 @@
 import AsyncAlgorithms
 import Foundation
 import PersistableTimerCore
+import ConcurrencyExtras
 
 /// A class for managing a persistable timer, capable of restoring state after application termination.
-public final class PersistableTimer {
+public final class PersistableTimer: Sendable {
     /// An async stream of timer states, providing continuous updates.
     public var timeStream: AsyncStream<TimerState> {
         if !shouldEmitTimeStream {
@@ -12,11 +13,15 @@ public final class PersistableTimer {
         return stream.stream
     }
 
-    private var restoreTimerData: RestoreTimerData?
-    private var timerType: TimerType?
-    private var stream = AsyncStream<TimerState>.makeStream()
+    private let restoreTimerData: LockIsolated<RestoreTimerData?> = .init(nil)
+    private let timerType: LockIsolated<TimerType?> = .init(nil)
+    private let stream: LockIsolated<(
+        stream: AsyncStream<TimerState>,
+        continuation: AsyncStream<TimerState>.Continuation
+    )> = .init(AsyncStream<TimerState>.makeStream())
+
     private let container: RestoreTimerContainer
-    private let now: () -> Date
+    nonisolated(unsafe) private let now: () -> Date
 
     /// The interval at which the timer updates its elapsed time.
     let updateInterval: TimeInterval
@@ -54,7 +59,7 @@ public final class PersistableTimer {
     }
 
     deinit {
-        timerType?.cancel()
+        timerType.value?.cancel()
     }
 
     /// Retrieves the persisted timer data if available.
@@ -105,7 +110,7 @@ public final class PersistableTimer {
             type: type,
             forceStart: forceStart
         )
-        self.restoreTimerData = restoreTimerData
+        self.restoreTimerData.setValue(restoreTimerData)
 
         stream.continuation.yieldIfNeeded(restoreTimerData.elapsedTimeAndStatus(now: now), enable: shouldEmitTimeStream)
         startTimerIfNeeded()
@@ -120,7 +125,7 @@ public final class PersistableTimer {
     public func resume() async throws -> RestoreTimerData {
         let now = now()
         let restoreTimerData = try await container.resume(id: id, now: now)
-        self.restoreTimerData = restoreTimerData
+        self.restoreTimerData.setValue(restoreTimerData)
 
         stream.continuation.yieldIfNeeded(restoreTimerData.elapsedTimeAndStatus(now: now), enable: shouldEmitTimeStream)
         startTimerIfNeeded()
@@ -135,7 +140,7 @@ public final class PersistableTimer {
     public func pause() async throws -> RestoreTimerData {
         let now = now()
         let restoreTimerData = try await container.pause(id: id, now: now)
-        self.restoreTimerData = restoreTimerData
+        self.restoreTimerData.setValue(restoreTimerData)
 
         stream.continuation.yieldIfNeeded(restoreTimerData.elapsedTimeAndStatus(now: now), enable: shouldEmitTimeStream)
         invalidate()
@@ -156,7 +161,7 @@ public final class PersistableTimer {
             if isResetTime {
                 elapsedTimeAndStatus.elapsedTime = 0
             }
-            self.restoreTimerData = restoreTimerData
+            self.restoreTimerData.setValue(restoreTimerData)
             stream.continuation.yieldIfNeeded(elapsedTimeAndStatus, enable: shouldEmitTimeStream)
             invalidate(isFinish: true)
 
@@ -174,19 +179,21 @@ public final class PersistableTimer {
         }
         invalidate(isFinish: true)
         if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *), !useFoundationTimer {
-            self.timerType = .asyncTimerSequence(
-                Task { [weak self] in
-                    let timer = AsyncTimerSequence(interval: .seconds(self?.updateInterval ?? 1), clock: .continuous)
-                    for await _ in timer {
-                        self?.updateTimerStream()
+            self.timerType.setValue(
+                .asyncTimerSequence(
+                    Task { [weak self] in
+                        let timer = AsyncTimerSequence(interval: .seconds(self?.updateInterval ?? 1), clock: .continuous)
+                        for await _ in timer {
+                            self?.updateTimerStream()
+                        }
                     }
-                }
+                )
             )
         } else {
-            let timer = Timer(fire: now(), interval: updateInterval, repeats: true) { [weak self] timer in
+            nonisolated(unsafe) let timer = Timer(fire: now(), interval: updateInterval, repeats: true) { [weak self] timer in
                 self?.updateTimerStream()
             }
-            self.timerType = .timer(timer)
+            self.timerType.setValue(.timer(timer))
             RunLoop.main.add(timer, forMode: .common)
         }
     }
@@ -195,18 +202,18 @@ public final class PersistableTimer {
     ///
     /// - Parameter isFinish: A Boolean value indicating whether to finish the stream.
     private func invalidate(isFinish: Bool = false) {
-        timerType?.cancel()
-        timerType = nil
+        timerType.value?.cancel()
+        timerType.setValue(nil)
         if isFinish && shouldEmitTimeStream {
             stream.continuation.finish()
-            stream = AsyncStream<TimerState>.makeStream()
+            stream.setValue(AsyncStream<TimerState>.makeStream())
         }
     }
 
     private func updateTimerStream() {
-        guard let restoreTimerData = try? restoreTimerData ?? container.getTimerData(id: id)
+        guard let restoreTimerData = try? restoreTimerData.value ?? container.getTimerData(id: id)
         else {
-            timerType?.cancel()
+            timerType.value?.cancel()
             return
         }
         let timerState = restoreTimerData.elapsedTimeAndStatus(now: now())
@@ -215,7 +222,7 @@ public final class PersistableTimer {
 }
 
 private extension PersistableTimer {
-    private enum TimerType {
+    private enum TimerType: @unchecked Sendable {
         case timer(Timer)
         case asyncTimerSequence(Task<Void, Never>)
 
@@ -232,7 +239,7 @@ private extension PersistableTimer {
 
 extension AsyncStream.Continuation {
     @discardableResult
-    func yieldIfNeeded(_ value: Element, enable: Bool) -> AsyncStream<Element>.Continuation.YieldResult? {
+    func yieldIfNeeded(_ value: sending Element, enable: Bool) -> AsyncStream<Element>.Continuation.YieldResult? {
         if enable {
             return yield(value)
         } else {
