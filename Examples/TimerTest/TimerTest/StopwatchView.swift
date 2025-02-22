@@ -42,6 +42,16 @@ final class StopwatchModel {
         }
     }
 
+    /// Calls addElapsedTime(5) to increase the stopwatch's elapsed time by 5 seconds.
+    func addExtraElapsedTime() async {
+        do {
+            let container = try await persistableTimer.addElapsedTime(5)
+            self.timerState = container.elapsedTimeAndStatus()
+        } catch {
+            print("Error adding elapsed time: \(error)")
+        }
+    }
+
     func synchronize() async {
         timerState = try? persistableTimer.getTimerData()?.elapsedTimeAndStatus()
     }
@@ -55,7 +65,7 @@ struct StopwatchView: View {
     let stopwatchModel: StopwatchModel
 
     public var body: some View {
-        VStack {
+        VStack(spacing: 20) {
             Text(timerState: stopwatchModel.timerState)
                 .font(.title)
 
@@ -65,6 +75,11 @@ struct StopwatchView: View {
                 }
             } label: {
                 Text(stopwatchModel.buttonTitle)
+            }
+            Button("Add 5 sec") {
+                Task {
+                    await stopwatchModel.addExtraElapsedTime()
+                }
             }
         }
         .task {

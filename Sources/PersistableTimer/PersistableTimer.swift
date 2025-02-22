@@ -172,6 +172,40 @@ public final class PersistableTimer: Sendable {
         }
     }
 
+    /// For a timer, adds extra time to the remaining duration.
+    ///
+    /// - Parameter extraTime: The time (in seconds) to add.
+    /// - Throws: An error if the timer type is not .timer.
+    /// - Returns: The updated RestoreTimerData.
+    @discardableResult
+    public func addRemainingTime(_ extraTime: TimeInterval) async throws -> RestoreTimerData {
+        let now = self.now()
+        let currentData = try container.getTimerData(id: id)
+        guard case .timer = currentData.type else {
+            throw PersistableTimerClientError.invalidTimerType
+        }
+        let updatedData = try await container.addRemainingTime(id: id, extraTime: extraTime, now: now)
+        stream.continuation.yieldIfNeeded(updatedData.elapsedTimeAndStatus(now: now), enable: shouldEmitTimeStream)
+        return updatedData
+    }
+
+    /// For a stopwatch, adds extra elapsed time by moving the start date earlier.
+    ///
+    /// - Parameter extraTime: The time (in seconds) to add.
+    /// - Throws: An error if the timer type is not .stopwatch.
+    /// - Returns: The updated RestoreTimerData.
+    @discardableResult
+    public func addElapsedTime(_ extraTime: TimeInterval) async throws -> RestoreTimerData {
+        let now = self.now()
+        let currentData = try container.getTimerData(id: id)
+        guard case .stopwatch = currentData.type else {
+            throw PersistableTimerClientError.invalidTimerType
+        }
+        let updatedData = try await container.addElapsedTime(id: id, extraTime: extraTime, now: now)
+        stream.continuation.yieldIfNeeded(updatedData.elapsedTimeAndStatus(now: now), enable: shouldEmitTimeStream)
+        return updatedData
+    }
+
     /// Starts the timer if it's not already running.
     private func startTimerIfNeeded() {
         guard shouldEmitTimeStream else {

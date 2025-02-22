@@ -53,6 +53,16 @@ final class TimerModel {
         }
     }
 
+    /// Calls addRemainingTime(5) to extend the timer's remaining duration by 5 seconds.
+    func addExtraTime() async {
+        do {
+            let container = try await persistableTimer.addRemainingTime(5)
+            self.timerState = container.elapsedTimeAndStatus()
+        } catch {
+            print("Error adding remaining time: \(error)")
+        }
+    }
+
     func synchronize() async {
         timerState = try? persistableTimer.getTimerData()?.elapsedTimeAndStatus()
     }
@@ -66,7 +76,7 @@ struct TimerView: View {
     @Bindable var timerModel: TimerModel
 
     var body: some View {
-        VStack {
+        VStack(spacing: 20) {
             if let timerState = timerModel.timerState {
                 Text(timerState: timerState)
                     .font(.title)
@@ -83,6 +93,14 @@ struct TimerView: View {
                 }
             } label: {
                 Text(timerModel.buttonTitle)
+            }
+            // 「Add 5 sec」ボタンは、タイマータイプ（.timer）の場合のみ表示
+            if let timerState = timerModel.timerState, case .timer = timerState.type {
+                Button("Add 5 sec") {
+                    Task {
+                        await timerModel.addExtraTime()
+                    }
+                }
             }
         }
         .task {
