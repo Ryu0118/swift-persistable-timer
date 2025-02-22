@@ -169,6 +169,46 @@ public struct RestoreTimerContainer: Sendable {
             }
         }
     }
+
+    /// For a timer, adds extra time to the remaining duration.
+    ///
+    /// - Parameters:
+    ///   - id: The optional identifier for the timer.
+    ///   - extraTime: The time (in seconds) to add.
+    ///   - now: The current date (defaults to Date()).
+    /// - Throws: An error if the timer type is not .timer.
+    /// - Returns: The updated RestoreTimerData.
+    @discardableResult
+    public func addRemainingTime(id: String? = nil, extraTime: TimeInterval, now: Date = Date()) async throws -> RestoreTimerData {
+        var restoreTimerData = try getTimerData(id: id)
+        guard case .timer(let currentDuration) = restoreTimerData.type else {
+            throw PersistableTimerClientError.invalidTimerType
+        }
+        let newDuration = currentDuration + extraTime
+        restoreTimerData.type = .timer(duration: newDuration)
+        try await dataSource.set(restoreTimerData, forKey: Const.persistableTimerKey(id: id))
+        return restoreTimerData
+    }
+
+    /// For a stopwatch, adds extra elapsed time by moving the start date earlier.
+    ///
+    /// - Parameters:
+    ///   - id: The optional identifier for the timer.
+    ///   - extraTime: The time (in seconds) to add.
+    ///   - now: The current date (defaults to Date()).
+    /// - Throws: An error if the timer type is not .stopwatch.
+    /// - Returns: The updated RestoreTimerData.
+    @discardableResult
+    public func addElapsedTime(id: String? = nil, extraTime: TimeInterval, now: Date = Date()) async throws -> RestoreTimerData {
+        var restoreTimerData = try getTimerData(id: id)
+        guard case .stopwatch = restoreTimerData.type else {
+            throw PersistableTimerClientError.invalidTimerType
+        }
+        // Adjust the start date earlier by extraTime to increase the elapsed time.
+        restoreTimerData.startDate = restoreTimerData.startDate.addingTimeInterval(-extraTime)
+        try await dataSource.set(restoreTimerData, forKey: Const.persistableTimerKey(id: id))
+        return restoreTimerData
+    }
 }
 
 /// Errors specific to the PersistableTimerClient.
@@ -177,4 +217,5 @@ public enum PersistableTimerClientError: Error, Sendable {
     case timerHasNotPaused
     case timerAlreadyPaused
     case timerAlreadyStarted
+    case invalidTimerType
 }
