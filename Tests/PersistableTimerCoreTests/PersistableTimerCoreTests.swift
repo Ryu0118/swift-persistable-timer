@@ -255,45 +255,69 @@ import Foundation
     }
 
     @Test func addRemainingTimeSuccessfully() async throws {
-          let startDate = Date()
-          let initialDuration: TimeInterval = 10
-          let extraTime: TimeInterval = 5
-          _ = try await restoreTimerContainer.start(now: startDate, type: .timer(duration: initialDuration))
-          let updatedTimerData = try await restoreTimerContainer.addRemainingTime(extraTime: extraTime)
-          if case .timer(let newDuration) = updatedTimerData.type {
-              #expect(newDuration.ceilInt == (initialDuration + extraTime).ceilInt)
-          } else {
-              throw PersistableTimerClientError.invalidTimerType
-          }
-      }
+        let startDate = Date()
+        let initialDuration: TimeInterval = 10
+        let extraTime: TimeInterval = 5
+        _ = try await restoreTimerContainer.start(now: startDate, type: .timer(duration: initialDuration))
+        let updatedTimerData = try await restoreTimerContainer.addRemainingTime(extraTime: extraTime)
+        if case .timer(let newDuration) = updatedTimerData.type {
+            #expect(newDuration.ceilInt == (initialDuration + extraTime).ceilInt)
+        } else {
+            throw PersistableTimerClientError.invalidTimerType
+        }
+    }
 
-      @Test func addRemainingTimeThrowsErrorForNonTimer() async throws {
-          _ = try await restoreTimerContainer.start(type: .stopwatch)
-          await #expect { try await restoreTimerContainer.addRemainingTime(extraTime: 5) } throws: { error in
-              let timerError = try #require(error as? PersistableTimerClientError)
-              return timerError == .invalidTimerType
-          }
-      }
+    @Test func addRemainingTimeThrowsErrorForNonTimer() async throws {
+        _ = try await restoreTimerContainer.start(type: .stopwatch)
+        await #expect { try await restoreTimerContainer.addRemainingTime(extraTime: 5) } throws: { error in
+            let timerError = try #require(error as? PersistableTimerClientError)
+            return timerError == .invalidTimerType
+        }
+    }
 
-      @Test func addElapsedTimeSuccessfully() async throws {
-          let startDate = Date()
-          let extraTime: TimeInterval = 5
-          _ = try await restoreTimerContainer.start(now: startDate, type: .stopwatch)
-          let updatedTimerData = try await restoreTimerContainer.addElapsedTime(extraTime: extraTime)
-          let testNow = startDate.addingTimeInterval(3)
-          let timerState = updatedTimerData.elapsedTimeAndStatus(now: testNow)
-          // Since the startDate is moved 5 seconds earlier, elapsed time should be 3 + 5 = 8 seconds.
-          #expect(timerState.elapsedTime.ceilInt == 8)
-      }
+    @Test func addElapsedTimeSuccessfully() async throws {
+        let startDate = Date()
+        let extraTime: TimeInterval = 5
+        _ = try await restoreTimerContainer.start(now: startDate, type: .stopwatch)
+        let updatedTimerData = try await restoreTimerContainer.addElapsedTime(extraTime: extraTime)
+        let testNow = startDate.addingTimeInterval(3)
+        let timerState = updatedTimerData.elapsedTimeAndStatus(now: testNow)
+        // Since the startDate is moved 5 seconds earlier, elapsed time should be 3 + 5 = 8 seconds.
+        #expect(timerState.elapsedTime.ceilInt == 8)
+    }
 
-      @Test func addElapsedTimeThrowsErrorForNonStopwatch() async throws {
-          let startDate = Date()
-          _ = try await restoreTimerContainer.start(now: startDate, type: .timer(duration: 10))
-          await #expect { try await restoreTimerContainer.addElapsedTime(extraTime: 5) } throws: { error in
-              let timerError = try #require(error as? PersistableTimerClientError)
-              return timerError == .invalidTimerType
-          }
-      }
+    @Test func addElapsedTimeThrowsErrorForNonStopwatch() async throws {
+        let startDate = Date()
+        _ = try await restoreTimerContainer.start(now: startDate, type: .timer(duration: 10))
+        await #expect { try await restoreTimerContainer.addElapsedTime(extraTime: 5) } throws: { error in
+            let timerError = try #require(error as? PersistableTimerClientError)
+            return timerError == .invalidTimerType
+        }
+    }
+
+    @Test func elapsedTimeAndStatusSetsLastCalculatedAtCorrectly() async throws {
+        let startDate = Date()
+        let calculationDate = startDate.addingTimeInterval(3)
+        try await restoreTimerContainer.start(now: startDate, type: .stopwatch)
+        let timerData = try restoreTimerContainer.getTimerData()
+        let state = timerData.elapsedTimeAndStatus(now: calculationDate)
+        #expect(state.lastElapsedTimeCalculatedAt == calculationDate)
+    }
+
+    @Test func elapsedTimeAndStatusUpdatesLastCalculatedAtWithMultipleCalls() async throws {
+        let startDate = Date()
+        try await restoreTimerContainer.start(now: startDate, type: .stopwatch)
+        let timerData = try restoreTimerContainer.getTimerData()
+
+        let firstCalculationDate = startDate.addingTimeInterval(2)
+        let state1 = timerData.elapsedTimeAndStatus(now: firstCalculationDate)
+
+        let secondCalculationDate = startDate.addingTimeInterval(5)
+        let state2 = timerData.elapsedTimeAndStatus(now: secondCalculationDate)
+
+        #expect(state1.lastElapsedTimeCalculatedAt == firstCalculationDate)
+        #expect(state2.lastElapsedTimeCalculatedAt == secondCalculationDate)
+    }
 }
 
 fileprivate extension TimeInterval {
