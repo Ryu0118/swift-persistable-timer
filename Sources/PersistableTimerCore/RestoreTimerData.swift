@@ -2,14 +2,20 @@ import Foundation
 
 /// Represents the status of a timer.
 public enum TimerStatus: Sendable, Codable, Hashable {
+    /// The timer is currently running.
     case running
+    /// The timer is currently paused.
     case paused
+    /// The timer has finished.
     case finished
 }
 
 /// Represents a period during which the timer is paused.
 public struct PausePeriod: Sendable, Codable, Hashable {
+    /// The date and time when the timer was paused.
     public var pause: Date
+    /// The date and time when the timer resumed.
+    /// If `nil`, the timer is still paused.
     public var start: Date?
 
     public init(pause: Date, start: Date?) {
@@ -18,34 +24,62 @@ public struct PausePeriod: Sendable, Codable, Hashable {
     }
 }
 
-/// Represents the state of a timer, including elapsed time and status.
-public struct TimerState: Sendable, Codable, Hashable {
-    public let startDate: Date
-    public var elapsedTime: TimeInterval
-    public var status: TimerStatus
-    public var type: RestoreType
-    public var pausePeriods: [PausePeriod]
+/// Represents the type of timer, either a stopwatch or a countdown timer.
+public enum RestoreType: Codable, Hashable, Sendable {
+    /// A stopwatch timer.
+    case stopwatch
+    /// A countdown timer with a specified duration (in seconds).
+    case timer(duration: TimeInterval)
+}
 
+/// Represents the state of a timer, including elapsed time, status, and the last calculation timestamp.
+public struct TimerState: Sendable, Codable, Hashable {
+    /// The date and time when the timer started.
+    public let startDate: Date
+    /// The total elapsed time of the timer in seconds, adjusted for any pause durations.
+    public var elapsedTime: TimeInterval
+    /// The current status of the timer (running, paused, or finished).
+    public var status: TimerStatus
+    /// The type of timer operation (stopwatch or timer with duration).
+    public var type: RestoreType
+    /// An array of periods during which the timer was paused.
+    public var pausePeriods: [PausePeriod]
+    /// The date and time when the elapsed time was last calculated.
+    ///
+    /// This property is updated each time `elapsedTimeAndStatus(now:)` is called,
+    /// and represents the moment when the elapsed time and timer status were computed.
+    public let lastElapsedTimeCalculatedAt: Date
+
+    /// The computed time value for the timer.
+    ///
+    /// - For a stopwatch, this value is equal to `elapsedTime`.
+    /// - For a countdown timer, this value is the remaining time (initial duration minus `elapsedTime`).
     public var time: TimeInterval {
         switch type {
         case .stopwatch:
-            elapsedTime
+            return elapsedTime
         case let .timer(duration):
-            duration - elapsedTime
+            return duration - elapsedTime
         }
     }
 
-    /// Calculates the display date for the timer or stopwatch.
-    /// - Returns: The `Date` to be displayed in the `Text` view.
+    /// The display date used for UI representation of the timer.
+    ///
+    /// - For a stopwatch, this is calculated by subtracting `elapsedTime` from the current time.
+    /// - For a timer, this is calculated by subtracting `elapsedTime` from the timer's duration.
     public var displayDate: Date {
         switch type {
         case .stopwatch:
-            Date(timeIntervalSinceNow: -elapsedTime)
+            return Date(timeIntervalSinceNow: -elapsedTime)
         case let .timer(duration):
-            Date(timeIntervalSinceNow: duration - elapsedTime)
+            return Date(timeIntervalSinceNow: duration - elapsedTime)
         }
     }
 
+    /// The timer interval used for creating countdown or stopwatch animations.
+    ///
+    /// For a stopwatch, if a pause exists, it returns a range ending at the pause time.
+    /// For a timer, it returns a range from the start date to the expected finish date.
     package var timerInterval: ClosedRange<Date> {
         switch type {
         case .stopwatch:
@@ -63,6 +97,10 @@ public struct TimerState: Sendable, Codable, Hashable {
         }
     }
 
+    /// The time at which the timer is set to resume if it is currently paused.
+    ///
+    /// - For a stopwatch, if currently paused, returns the pause time.
+    /// - For a timer, if currently paused, returns the expected resume time.
     package var pauseTime: Date? {
         switch type {
         case .stopwatch:
@@ -85,58 +123,56 @@ public struct TimerState: Sendable, Codable, Hashable {
         elapsedTime: TimeInterval,
         status: TimerStatus,
         type: RestoreType,
-        pausePeriods: [PausePeriod]
+        pausePeriods: [PausePeriod],
+        lastElapsedTimeCalculatedAt: Date
     ) {
         self.startDate = startDate
         self.elapsedTime = elapsedTime
         self.status = status
         self.type = type
         self.pausePeriods = pausePeriods
+        self.lastElapsedTimeCalculatedAt = lastElapsedTimeCalculatedAt
     }
-}
-
-/// Represents the type of restoration for a timer, either a stopwatch or a countdown timer.
-public enum RestoreType: Codable, Hashable, Sendable {
-    case stopwatch
-    case timer(duration: TimeInterval)
 }
 
 /// Represents the data required to restore a timer's state.
 public struct RestoreTimerData: Codable, Hashable, Sendable {
+    /// The date and time when the timer was started.
     public var startDate: Date
+    /// An array of pause periods during which the timer was paused.
     public var pausePeriods: [PausePeriod]
+    /// The type of timer (stopwatch or timer with duration).
     public var type: RestoreType
+    /// The date and time when the timer was stopped, if applicable.
     public var stopDate: Date?
-
-    public init(startDate: Date, pausePeriods: [PausePeriod], type: RestoreType, stopDate: Date? = nil) {
-        self.startDate = startDate
-        self.pausePeriods = pausePeriods
-        self.type = type
-        self.stopDate = stopDate
-    }
 
     /// Calculates the elapsed time and determines the current status of the timer.
     ///
-    /// - Parameter now: The current date and time, defaults to `Date()`.
-    /// - Returns: The `TimerState` representing the elapsed time and the current status.
+    /// This method accounts for any pause periods and adjusts the elapsed time accordingly.
+    /// It also records the current time as `lastElapsedTimeCalculatedAt` in the returned `TimerState`,
+    /// indicating when the calculation was performed.
+    ///
+    /// - Parameter now: The current date and time. Defaults to `Date()`.
+    /// - Returns: A `TimerState` representing the timer's state, including the adjusted elapsed time,
+    ///            current status, and the timestamp of the calculation.
     public func elapsedTimeAndStatus(now: Date = Date()) -> TimerState {
         let endDate = stopDate ?? now
         var elapsedTime = endDate.timeIntervalSince(startDate)
         var status: TimerStatus = .running
 
         for period in pausePeriods {
-            if let start = period.start, start < endDate {
-                let pauseTime = start.timeIntervalSince(period.pause)
-                elapsedTime -= pauseTime
+            if let resumeTime = period.start, resumeTime < endDate {
+                let pauseDuration = resumeTime.timeIntervalSince(period.pause)
+                elapsedTime -= pauseDuration
             } else {
-                let pauseTime = endDate.timeIntervalSince(period.pause)
-                elapsedTime -= pauseTime
+                let pauseDuration = endDate.timeIntervalSince(period.pause)
+                elapsedTime -= pauseDuration
                 status = .paused
                 break
             }
         }
 
-        if let _ = stopDate {
+        if stopDate != nil {
             status = .finished
         }
 
@@ -145,7 +181,8 @@ public struct RestoreTimerData: Codable, Hashable, Sendable {
             elapsedTime: max(elapsedTime, 0),
             status: status,
             type: type,
-            pausePeriods: pausePeriods
+            pausePeriods: pausePeriods,
+            lastElapsedTimeCalculatedAt: now
         )
     }
 }
