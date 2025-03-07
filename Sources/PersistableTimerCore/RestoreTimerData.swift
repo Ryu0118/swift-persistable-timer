@@ -85,7 +85,7 @@ public struct TimerState: Sendable, Codable, Hashable {
         case .stopwatch:
             if let lastPausePeriod = pausePeriods.last {
                 if #available(iOS 18, macCatalyst 18, macOS 18, tvOS 18, visionOS 2, watchOS 11, *) {
-                    lastPausePeriod.pause.addingTimeInterval(-elapsedTime + 1) ... lastPausePeriod.pause
+                    lastPausePeriod.pause.addingTimeInterval(min(0, -elapsedTime + 1)) ... lastPausePeriod.pause
                 } else {
                     lastPausePeriod.pause.addingTimeInterval(-elapsedTime) ... lastPausePeriod.pause
                 }
@@ -93,7 +93,7 @@ public struct TimerState: Sendable, Codable, Hashable {
                 startDate ... startDate
             }
         case .timer(let duration):
-            startDate ... startDate.addingTimeInterval(duration - elapsedTime)
+            startDate ... startDate.addingTimeInterval(duration - elapsedTime - 1)
         }
     }
 
@@ -161,7 +161,7 @@ public struct RestoreTimerData: Codable, Hashable, Sendable {
         var status: TimerStatus = .running
 
         for period in pausePeriods {
-            if let resumeTime = period.start, resumeTime < endDate {
+            if let resumeTime = period.start {
                 let pauseDuration = resumeTime.timeIntervalSince(period.pause)
                 elapsedTime -= pauseDuration
             } else {
