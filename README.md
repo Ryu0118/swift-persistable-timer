@@ -28,87 +28,49 @@ Then add the desired products (`PersistableTimer`, `PersistableTimerCore`, or `P
 
 ## Usage
 
-### Initialization
-
-Instantiate `PersistableTimer` with your preferred data source and configuration:
+### Basic Setup
 
 ```swift
 import PersistableTimer
 
-// For testing or previews:
-let timer = PersistableTimer(dataSourceType: .inMemory)
-
-// For production (using UserDefaults):
+// For production (with persistence):
 let timer = PersistableTimer(dataSourceType: .userDefaults(.standard))
 
-// With a custom update interval:
-let timer = PersistableTimer(dataSourceType: .userDefaults(.standard), updateInterval: 0.5)
+// For testing or previews:
+let timer = PersistableTimer(dataSourceType: .inMemory)
 ```
 
-### Starting a Timer
-
-Start a stopwatch or a countdown timer. You can also force-start a new timer even if one is already running:
+### Stopwatch Mode
 
 ```swift
 // Start a stopwatch
 try await timer.start(type: .stopwatch)
 
-// Start a countdown timer with a duration of 100 seconds
-try await timer.start(type: .timer(duration: 100))
-
-// Force start a new timer even if one is already active:
-try await timer.start(type: .timer(duration: 100), forceStart: true)
-```
-
-### Pausing, Resuming, and Finishing
-
-Control the timer state as needed:
-
-```swift
-// Pause the timer
+// Pause and resume
 try await timer.pause()
-
-// Resume a paused timer
 try await timer.resume()
 
-// Finish the timer (optionally reset the elapsed time)
-try await timer.finish(isResetTime: false)
+// Add extra elapsed time (moves start date back by 5 seconds)
+try await timer.addElapsedTime(5)
+
+// Finish the stopwatch
+try await timer.finish()
 ```
 
-### Dynamic Time Adjustments
-
-Adjust the timer on the fly:
+### Countdown Timer Mode
 
 ```swift
-// For countdown timers: add extra time to the remaining duration.
-try await timer.addRemainingTime(5) // Adds 5 seconds
+// Start a 100-second countdown
+try await timer.start(type: .timer(duration: 100))
 
-// For stopwatches: add extra elapsed time (i.e., effectively moving the start date earlier).
-try await timer.addElapsedTime(5) // Adds 5 seconds to the elapsed time
+// Add extra time to the countdown
+try await timer.addRemainingTime(30) // Now 130 seconds total
+
+// Force restart even if already running
+try await timer.start(type: .timer(duration: 60), forceStart: true)
 ```
 
-### Restoring Timer State
-
-Restore the timer's previous state after an app restart:
-
-```swift
-try timer.restore()
-```
-
-### Receiving Timer Updates
-
-Subscribe to the asynchronous time stream to update your UI in real time:
-
-```swift
-for await timeState in timer.timeStream {
-    // Update your UI with the current timer state.
-    print("Elapsed time: \(timeState.elapsedTime)")
-}
-```
-
-### SwiftUI Integration with PersistableTimerText
-
-Display the timer state easily in your SwiftUI views using the provided Text initializer:
+### Real-time Updates with SwiftUI
 
 ```swift
 import SwiftUI
@@ -116,16 +78,159 @@ import PersistableTimerText
 
 struct TimerView: View {
     @State private var timerState: TimerState?
+    let timer = PersistableTimer(dataSourceType: .userDefaults(.standard))
 
     var body: some View {
-        Text(timerState: timerState)
-            .font(.title)
-            .onAppear {
-                // Update `timerState` with your PersistableTimer's current state.
+        VStack {
+            // Automatic timer display
+            Text(timerState: timerState)
+                .font(.largeTitle)
+
+            HStack {
+                Button("Start") {
+                    Task { try? await timer.start(type: .timer(duration: 60)) }
+                }
+                Button("Pause") {
+                    Task { try? await timer.pause() }
+                }
+                Button("Resume") {
+                    Task { try? await timer.resume() }
+                }
             }
+        }
+        .task {
+            // Subscribe to timer updates
+            for await state in timer.timeStream {
+                timerState = state
+            }
+        }
+        .onAppear {
+            // Restore timer state after app restart
+            try? timer.restore()
+        }
     }
 }
 ```
+
+### Managing Multiple Timers
+
+Use unique IDs to manage multiple timers simultaneously:
+
+```swift
+let workoutTimer = PersistableTimer(
+    id: "workout",
+    dataSourceType: .userDefaults(.standard)
+)
+
+let restTimer = PersistableTimer(
+    id: "rest",
+    dataSourceType: .userDefaults(.standard)
+)
+
+// Each timer maintains its own state
+try await workoutTimer.start(type: .timer(duration: 300))
+try await restTimer.start(type: .timer(duration: 60))
+```
+
+### Advanced Configuration
+
+```swift
+let timer = PersistableTimer(
+    id: "custom",
+    dataSourceType: .userDefaults(.standard),
+    shouldEmitTimeStream: true,      // Enable real-time updates
+    updateInterval: 0.1,              // Update every 100ms (default: 1s)
+    useFoundationTimer: false,        // Use AsyncTimerSequence (default)
+    now: { Date() }                   // Custom date provider for testing
+)
+```
+
+### Accessing Timer State
+
+```swift
+// Check if timer is running
+if timer.isTimerRunning() {
+    print("Timer is active")
+}
+
+// Get current timer data
+if let data = try? timer.getTimerData() {
+    print("Started at: \(data.startDate)")
+    print("Type: \(data.type)")
+}
+
+// Subscribe to updates
+for await state in timer.timeStream {
+    print("Elapsed: \(state.elapsedTime)s")
+    print("Status: \(state.status)")
+
+    switch state.type {
+    case .stopwatch:
+        print("Stopwatch time: \(state.time)s")
+    case .timer(let duration):
+        print("Remaining: \(state.time)s / \(duration)s")
+    }
+}
+```
+
+### Error Handling
+
+```swift
+do {
+    try await timer.start(type: .stopwatch)
+} catch PersistableTimerClientError.timerAlreadyStarted {
+    print("Timer is already running")
+} catch {
+    print("Failed to start timer: \(error)")
+}
+
+// Common errors:
+// - .timerAlreadyStarted: Cannot start when already running (use forceStart: true)
+// - .timerAlreadyPaused: Cannot pause when already paused
+// - .timerHasNotPaused: Cannot resume when not paused
+// - .timerHasNotStarted: Cannot perform operation on non-existent timer
+// - .invalidTimerType: Wrong operation for timer type (e.g., addRemainingTime on stopwatch)
+```
+
+## API Reference
+
+### PersistableTimer
+
+| Method | Description |
+|--------|-------------|
+| `start(type:forceStart:)` | Start a new timer (stopwatch or countdown) |
+| `pause()` | Pause the running timer |
+| `resume()` | Resume a paused timer |
+| `finish(isResetTime:)` | Finish the timer, optionally resetting elapsed time |
+| `restore()` | Restore timer state after app restart |
+| `addElapsedTime(_:)` | Add elapsed time to stopwatch (moves start date back) |
+| `addRemainingTime(_:)` | Add time to countdown timer |
+| `isTimerRunning()` | Check if timer is currently active |
+| `getTimerData()` | Get the current timer data |
+
+### Core Types
+
+**TimerState** - Complete timer state with computed properties
+- `elapsedTime: TimeInterval` - Total elapsed time (adjusted for pauses)
+- `status: TimerStatus` - `.running`, `.paused`, or `.finished`
+- `type: RestoreType` - `.stopwatch` or `.timer(duration:)`
+- `time: TimeInterval` - Elapsed time for stopwatch, remaining for countdown
+- `displayDate: Date` - Date for UI display
+
+**RestoreType** - Timer operation mode
+- `.stopwatch` - Count up from zero
+- `.timer(duration: TimeInterval)` - Count down from duration
+
+**DataSourceType** - Storage backend
+- `.userDefaults(UserDefaults)` - Persistent storage
+- `.inMemory` - Temporary storage (testing/previews)
+
+### SwiftUI Text Extension
+
+```swift
+Text(timerState: timerState, countsDown: true)
+```
+Automatically displays and updates timer in `MM:SS` format. Shows `--:--` when `timerState` is `nil`.
 
 ## License
 
