@@ -98,12 +98,6 @@ struct TimerView: View {
                 }
             }
         }
-        .task {
-            // Subscribe to timer updates
-            for await state in timer.timeStream {
-                timerState = state
-            }
-        }
         .onAppear {
             // Restore timer state after app restart
             try? timer.restore()
@@ -141,7 +135,7 @@ let timer = PersistableTimer(
     shouldEmitTimeStream: true,      // Enable real-time updates
     updateInterval: 0.1,              // Update every 100ms (default: 1s)
     useFoundationTimer: false,        // Use AsyncTimerSequence (default)
-    now: { Date() }                   // Custom date provider for testing
+    now: { Date() }                   // Custom date provider
 )
 ```
 
