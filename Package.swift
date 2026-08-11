@@ -30,7 +30,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
-        .package(url: "https://github.com/pointfreeco/swift-concurrency-extras.git", exact: "1.3.1")
+        .package(url: "https://github.com/pointfreeco/swift-concurrency-extras.git", from: "1.3.1")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
