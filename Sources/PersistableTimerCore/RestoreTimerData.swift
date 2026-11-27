@@ -81,52 +81,45 @@ public struct TimerState: Sendable, Codable, Hashable {
     /// For a stopwatch, if a pause exists, it returns a range ending at the pause time.
     /// For a timer, it returns a range from the start date to the expected finish date.
     ///
-    /// The returned range is always valid (`lowerBound <= upperBound`), even when the remaining
-    /// time is less than one second, the duration has been exceeded, or `elapsedTime` is negative
-    /// or non-finite. In those cases the range collapses to a single date instead of trapping.
+    /// The returned range is always valid (`lowerBound <= upperBound`). When the computed bounds
+    /// would be inverted (e.g. a countdown timer paused with less than one second remaining or after
+    /// its duration was exceeded, or a negative / non-finite `elapsedTime`), the range collapses to a
+    /// single date instead of trapping. For all inputs that produced a valid range before, the result
+    /// is unchanged.
     package var timerInterval: ClosedRange<Date> {
-        let elapsedTime = sanitizedElapsedTime
         switch type {
         case .stopwatch:
             if let lastPausePeriod = pausePeriods.last {
                 if #available(iOS 18, macCatalyst 18, macOS 18, tvOS 18, visionOS 2, watchOS 11, *) {
-                    return Self.safeRange(
+                    Self.clampedRange(
                         lastPausePeriod.pause.addingTimeInterval(min(0, -elapsedTime + 1)),
-                        lastPausePeriod.pause
+                        lastPausePeriod.pause,
+                        fallback: lastPausePeriod.pause
                     )
                 } else {
-                    return Self.safeRange(
+                    Self.clampedRange(
                         lastPausePeriod.pause.addingTimeInterval(-elapsedTime),
-                        lastPausePeriod.pause
+                        lastPausePeriod.pause,
+                        fallback: lastPausePeriod.pause
                     )
                 }
             } else {
-                return startDate ... startDate
+                startDate ... startDate
             }
         case .timer(let duration):
-            return Self.safeRange(
+            Self.clampedRange(
                 startDate,
-                startDate.addingTimeInterval(Self.sanitized(duration) - elapsedTime - 1)
+                startDate.addingTimeInterval(duration - elapsedTime - 1),
+                fallback: startDate
             )
         }
     }
 
-    /// `elapsedTime` clamped to a finite, non-negative value.
-    private var sanitizedElapsedTime: TimeInterval {
-        max(Self.sanitized(elapsedTime), 0)
-    }
-
-    /// Returns `value` if it is finite, otherwise `0`.
-    private static func sanitized(_ value: TimeInterval) -> TimeInterval {
-        value.isFinite ? value : 0
-    }
-
-    /// Creates a closed range that never violates `lowerBound <= upperBound`.
+    /// Returns `lower ... upper` when it is a valid range, otherwise `fallback ... fallback`.
     ///
-    /// If `upper` is earlier than `lower` (or the comparison is not well-defined),
-    /// the range collapses to `lower ... lower`.
-    private static func safeRange(_ lower: Date, _ upper: Date) -> ClosedRange<Date> {
-        lower <= upper ? lower ... upper : lower ... lower
+    /// `ClosedRange` traps when `lower > upper` (or when the comparison is undefined, e.g. NaN dates).
+    private static func clampedRange(_ lower: Date, _ upper: Date, fallback: Date) -> ClosedRange<Date> {
+        lower <= upper ? lower ... upper : fallback ... fallback
     }
 
     /// The time at which the timer is set to resume if it is currently paused.
@@ -143,13 +136,19 @@ public struct TimerState: Sendable, Codable, Hashable {
             }
         case .timer(let duration):
             if let pausePeriod = pausePeriods.last, pausePeriod.start == nil {
-                // Never earlier than `startDate`, so it stays consistent with `timerInterval`
-                // even when the duration has already been exceeded.
-                startDate.addingTimeInterval(max(Self.sanitized(duration) - sanitizedElapsedTime, 0))
+                // Never earlier than `startDate` (or NaN), so it stays consistent with
+                // `timerInterval` even when the duration has already been exceeded.
+                // Unchanged whenever `duration - elapsedTime >= 0`.
+                startDate.addingTimeInterval(Self.nonNegativeOrZero(duration - elapsedTime))
             } else {
                 nil
             }
         }
+    }
+
+    /// Returns `value` if it is `>= 0`, otherwise `0` (including NaN).
+    private static func nonNegativeOrZero(_ value: TimeInterval) -> TimeInterval {
+        value >= 0 ? value : 0
     }
 
     public init(
