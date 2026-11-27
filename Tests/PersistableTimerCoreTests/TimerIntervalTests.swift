@@ -131,7 +131,7 @@ import Foundation
         #expect(interval.upperBound == pause)
 
         let legacyLower = legacyStopwatchLowerBound(elapsedTime: elapsedTime)
-        if legacyLower <= pause {
+        if !legacyLower.timeIntervalSinceReferenceDate.isNaN, legacyLower <= pause {
             // Did not crash before (e.g. iOS 18+ clamps with `min(0, ...)`): must be unchanged.
             #expect(interval == legacyLower ... pause)
         } else {
