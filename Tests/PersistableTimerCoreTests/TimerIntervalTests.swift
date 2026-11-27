@@ -2,67 +2,102 @@ import Testing
 import Foundation
 @testable import PersistableTimerCore
 
+/// Boundary tests for `TimerState.timerInterval` / `pauseTime`.
+///
+/// The OS-specific formulas are workarounds for differences in `Text(timerInterval:pauseTime:)`
+/// between iOS 17 and earlier and iOS 18 and later. These tests pin the original formulas
+/// (`legacy*` below) so the crash fix can't change the result for any input that produced
+/// a valid range before.
 @Suite struct TimerIntervalTests {
     let startDate = Date(timeIntervalSince1970: 1_000_000)
+    var pause: Date { startDate.addingTimeInterval(5) }
 
-    private func pausedState(
-        type: RestoreType,
-        elapsedTime: TimeInterval,
-        pause: Date? = nil
-    ) -> TimerState {
+    private func pausedState(type: RestoreType, elapsedTime: TimeInterval) -> TimerState {
         TimerState(
             startDate: startDate,
             elapsedTime: elapsedTime,
             status: .paused,
             type: type,
-            pausePeriods: [PausePeriod(pause: pause ?? startDate.addingTimeInterval(5), start: nil)],
+            pausePeriods: [PausePeriod(pause: pause, start: nil)],
             lastElapsedTimeCalculatedAt: startDate
         )
     }
 
-    // MARK: - Countdown timer
+    // MARK: - Original formulas (before the crash fix), kept as reference
+
+    private func legacyTimerUpperBound(duration: TimeInterval, elapsedTime: TimeInterval) -> Date {
+        startDate.addingTimeInterval(duration - elapsedTime - 1)
+    }
+
+    private func legacyTimerPauseTime(duration: TimeInterval, elapsedTime: TimeInterval) -> Date {
+        startDate.addingTimeInterval(duration - elapsedTime)
+    }
+
+    private func legacyStopwatchLowerBound(elapsedTime: TimeInterval) -> Date {
+        if #available(iOS 18, macCatalyst 18, macOS 18, tvOS 18, visionOS 2, watchOS 11, *) {
+            pause.addingTimeInterval(min(0, -elapsedTime + 1))
+        } else {
+            pause.addingTimeInterval(-elapsedTime)
+        }
+    }
+
+    // MARK: - Countdown timer: normal range must be bit-identical
 
     @Test(arguments: [
-        // (duration, elapsedTime) -> duration - elapsedTime = 1, 0.5, 0, -10
+        // (duration, elapsedTime) with duration - elapsedTime >= 1
         (10.0, 9.0),
-        (10.0, 9.5),
-        (10.0, 10.0),
-        (10.0, 20.0),
+        (10.0, 3.0),
+        (10.0, 0.0),
+        (1.0, 0.0),
+        (60.0, 12.345),
+        (10.0, -5.0),
+        (.infinity, 3.0),
+        (10.0, -.infinity),
     ])
-    func timerIntervalDoesNotCrashNearOrPastDuration(duration: TimeInterval, elapsedTime: TimeInterval) throws {
+    func timerIntervalUnchangedWhenAtLeastOneSecondRemains(duration: TimeInterval, elapsedTime: TimeInterval) throws {
         let state = pausedState(type: .timer(duration: duration), elapsedTime: elapsedTime)
         let interval = state.timerInterval
         #expect(interval.lowerBound == startDate)
-        #expect(interval.lowerBound <= interval.upperBound)
+        #expect(interval.upperBound == legacyTimerUpperBound(duration: duration, elapsedTime: elapsedTime))
+        #expect(try #require(state.pauseTime) == legacyTimerPauseTime(duration: duration, elapsedTime: elapsedTime))
+    }
+
+    @Test(arguments: [(10.0, 9.5), (10.0, 10.0), (1.0, 0.75)])
+    func timerPauseTimeUnchangedWhenRemainingIsNonNegative(duration: TimeInterval, elapsedTime: TimeInterval) throws {
+        let state = pausedState(type: .timer(duration: duration), elapsedTime: elapsedTime)
+        #expect(try #require(state.pauseTime) == legacyTimerPauseTime(duration: duration, elapsedTime: elapsedTime))
+    }
+
+    // MARK: - Countdown timer: previously crashing range
+
+    @Test(arguments: [
+        // duration - elapsedTime = 0.5, 0, -10, and sub-second / negative durations
+        (10.0, 9.5),
+        (10.0, 10.0),
+        (10.0, 20.0),
+        (0.5, 0.0),
+        (0.0, 0.0),
+        (-1.0, 0.0),
+    ])
+    func timerIntervalCollapsesToStartDateWhenLessThanOneSecondRemains(duration: TimeInterval, elapsedTime: TimeInterval) throws {
+        let state = pausedState(type: .timer(duration: duration), elapsedTime: elapsedTime)
+        #expect(state.timerInterval == startDate ... startDate)
 
         let pauseTime = try #require(state.pauseTime)
-        #expect(pauseTime >= interval.lowerBound)
+        #expect(pauseTime >= startDate)
         #expect(pauseTime == startDate.addingTimeInterval(max(duration - elapsedTime, 0)))
     }
 
-    @Test func timerIntervalKeepsExistingRangeWhenEnoughTimeRemains() throws {
-        let state = pausedState(type: .timer(duration: 10), elapsedTime: 3)
-        #expect(state.timerInterval == startDate ... startDate.addingTimeInterval(6))
-        #expect(try #require(state.pauseTime) == startDate.addingTimeInterval(7))
-    }
-
-    @Test(arguments: [-5.0, .nan, .infinity, -.infinity])
-    func timerIntervalHandlesInvalidElapsedTime(elapsedTime: TimeInterval) throws {
-        let state = pausedState(type: .timer(duration: 10), elapsedTime: elapsedTime)
-        let interval = state.timerInterval
-        #expect(interval.lowerBound <= interval.upperBound)
-        let pauseTime = try #require(state.pauseTime)
-        #expect(pauseTime >= interval.lowerBound)
-        #expect(pauseTime.timeIntervalSince1970.isFinite)
-    }
-
-    @Test(arguments: [0.0, 0.5, -1.0, .nan, .infinity])
-    func timerIntervalHandlesInvalidDuration(duration: TimeInterval) throws {
-        let state = pausedState(type: .timer(duration: duration), elapsedTime: 0)
-        let interval = state.timerInterval
-        #expect(interval.lowerBound <= interval.upperBound)
-        let pauseTime = try #require(state.pauseTime)
-        #expect(pauseTime >= interval.lowerBound)
+    @Test(arguments: [
+        (10.0, Double.nan),
+        (Double.nan, 0.0),
+        (10.0, Double.infinity),
+        (Double.infinity, Double.infinity),
+    ])
+    func timerIntervalHandlesNonFiniteValues(duration: TimeInterval, elapsedTime: TimeInterval) throws {
+        let state = pausedState(type: .timer(duration: duration), elapsedTime: elapsedTime)
+        #expect(state.timerInterval == startDate ... startDate)
+        #expect(try #require(state.pauseTime) == startDate)
     }
 
     @Test func timerIntervalFromRestoredDataPausedAfterDuration() throws {
@@ -75,20 +110,33 @@ import Foundation
         )
         let state = data.elapsedTimeAndStatus(now: startDate.addingTimeInterval(30))
         #expect(state.status == .paused)
-        let interval = state.timerInterval
-        #expect(interval.lowerBound <= interval.upperBound)
+        #expect(state.timerInterval == startDate ... startDate)
         #expect(try #require(state.pauseTime) == startDate)
     }
 
     // MARK: - Stopwatch
 
-    @Test(arguments: [0.0, 0.5, 1.0, 10.0, -1.0, -100.0, .nan, .infinity, -.infinity])
-    func stopwatchIntervalDoesNotCrash(elapsedTime: TimeInterval) throws {
-        let pause = startDate.addingTimeInterval(5)
-        let state = pausedState(type: .stopwatch, elapsedTime: elapsedTime, pause: pause)
+    @Test(arguments: [0.0, 0.5, 1.0, 10.0, 12.345, .infinity])
+    func stopwatchIntervalUnchangedForValidElapsedTime(elapsedTime: TimeInterval) throws {
+        let state = pausedState(type: .stopwatch, elapsedTime: elapsedTime)
+        #expect(state.timerInterval == legacyStopwatchLowerBound(elapsedTime: elapsedTime) ... pause)
+        #expect(try #require(state.pauseTime) == pause)
+    }
+
+    @Test(arguments: [-0.5, -1.0, -100.0, .nan, -.infinity])
+    func stopwatchIntervalDoesNotCrashForInvalidElapsedTime(elapsedTime: TimeInterval) throws {
+        let state = pausedState(type: .stopwatch, elapsedTime: elapsedTime)
         let interval = state.timerInterval
         #expect(interval.lowerBound <= interval.upperBound)
         #expect(interval.upperBound == pause)
+
+        let legacyLower = legacyStopwatchLowerBound(elapsedTime: elapsedTime)
+        if legacyLower <= pause {
+            // Did not crash before (e.g. iOS 18+ clamps with `min(0, ...)`): must be unchanged.
+            #expect(interval == legacyLower ... pause)
+        } else {
+            #expect(interval == pause ... pause)
+        }
         #expect(try #require(state.pauseTime) == pause)
     }
 
