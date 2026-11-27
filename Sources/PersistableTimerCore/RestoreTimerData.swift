@@ -80,21 +80,53 @@ public struct TimerState: Sendable, Codable, Hashable {
     ///
     /// For a stopwatch, if a pause exists, it returns a range ending at the pause time.
     /// For a timer, it returns a range from the start date to the expected finish date.
+    ///
+    /// The returned range is always valid (`lowerBound <= upperBound`), even when the remaining
+    /// time is less than one second, the duration has been exceeded, or `elapsedTime` is negative
+    /// or non-finite. In those cases the range collapses to a single date instead of trapping.
     package var timerInterval: ClosedRange<Date> {
+        let elapsedTime = sanitizedElapsedTime
         switch type {
         case .stopwatch:
             if let lastPausePeriod = pausePeriods.last {
                 if #available(iOS 18, macCatalyst 18, macOS 18, tvOS 18, visionOS 2, watchOS 11, *) {
-                    lastPausePeriod.pause.addingTimeInterval(min(0, -elapsedTime + 1)) ... lastPausePeriod.pause
+                    return Self.safeRange(
+                        lastPausePeriod.pause.addingTimeInterval(min(0, -elapsedTime + 1)),
+                        lastPausePeriod.pause
+                    )
                 } else {
-                    lastPausePeriod.pause.addingTimeInterval(-elapsedTime) ... lastPausePeriod.pause
+                    return Self.safeRange(
+                        lastPausePeriod.pause.addingTimeInterval(-elapsedTime),
+                        lastPausePeriod.pause
+                    )
                 }
             } else {
-                startDate ... startDate
+                return startDate ... startDate
             }
         case .timer(let duration):
-            startDate ... startDate.addingTimeInterval(duration - elapsedTime - 1)
+            return Self.safeRange(
+                startDate,
+                startDate.addingTimeInterval(Self.sanitized(duration) - elapsedTime - 1)
+            )
         }
+    }
+
+    /// `elapsedTime` clamped to a finite, non-negative value.
+    private var sanitizedElapsedTime: TimeInterval {
+        max(Self.sanitized(elapsedTime), 0)
+    }
+
+    /// Returns `value` if it is finite, otherwise `0`.
+    private static func sanitized(_ value: TimeInterval) -> TimeInterval {
+        value.isFinite ? value : 0
+    }
+
+    /// Creates a closed range that never violates `lowerBound <= upperBound`.
+    ///
+    /// If `upper` is earlier than `lower` (or the comparison is not well-defined),
+    /// the range collapses to `lower ... lower`.
+    private static func safeRange(_ lower: Date, _ upper: Date) -> ClosedRange<Date> {
+        lower <= upper ? lower ... upper : lower ... lower
     }
 
     /// The time at which the timer is set to resume if it is currently paused.
@@ -111,7 +143,9 @@ public struct TimerState: Sendable, Codable, Hashable {
             }
         case .timer(let duration):
             if let pausePeriod = pausePeriods.last, pausePeriod.start == nil {
-                startDate.addingTimeInterval(duration - elapsedTime)
+                // Never earlier than `startDate`, so it stays consistent with `timerInterval`
+                // even when the duration has already been exceeded.
+                startDate.addingTimeInterval(max(Self.sanitized(duration) - sanitizedElapsedTime, 0))
             } else {
                 nil
             }
