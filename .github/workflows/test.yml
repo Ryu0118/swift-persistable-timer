@@ -17,14 +17,14 @@ jobs:
     strategy:
       fail-fast: false    
       matrix:
-        os: [macos-14]
+        os: [macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 16.2
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
-        
+      - name: Show Swift version
+        run: swift --version
+
       - name: Test
         run: swift test

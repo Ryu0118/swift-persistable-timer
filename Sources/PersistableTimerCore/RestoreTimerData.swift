@@ -80,21 +80,48 @@ public struct TimerState: Sendable, Codable, Hashable {
     ///
     /// For a stopwatch, if a pause exists, it returns a range ending at the pause time.
     /// For a timer, it returns a range from the start date to the expected finish date.
+    ///
+    /// The returned range is always valid (`lowerBound <= upperBound`). When the computed bounds
+    /// would be inverted (e.g. a countdown timer paused with less than one second remaining or after
+    /// its duration was exceeded, or a negative / non-finite `elapsedTime`), the range collapses to a
+    /// single date instead of trapping. For all inputs that produced a valid range before, the result
+    /// is unchanged.
     package var timerInterval: ClosedRange<Date> {
         switch type {
         case .stopwatch:
             if let lastPausePeriod = pausePeriods.last {
                 if #available(iOS 18, macCatalyst 18, macOS 18, tvOS 18, visionOS 2, watchOS 11, *) {
-                    lastPausePeriod.pause.addingTimeInterval(min(0, -elapsedTime + 1)) ... lastPausePeriod.pause
+                    Self.clampedRange(
+                        lastPausePeriod.pause.addingTimeInterval(min(0, -elapsedTime + 1)),
+                        lastPausePeriod.pause,
+                        fallback: lastPausePeriod.pause
+                    )
                 } else {
-                    lastPausePeriod.pause.addingTimeInterval(-elapsedTime) ... lastPausePeriod.pause
+                    Self.clampedRange(
+                        lastPausePeriod.pause.addingTimeInterval(-elapsedTime),
+                        lastPausePeriod.pause,
+                        fallback: lastPausePeriod.pause
+                    )
                 }
             } else {
                 startDate ... startDate
             }
         case .timer(let duration):
-            startDate ... startDate.addingTimeInterval(duration - elapsedTime - 1)
+            Self.clampedRange(
+                startDate,
+                startDate.addingTimeInterval(duration - elapsedTime - 1),
+                fallback: startDate
+            )
         }
+    }
+
+    /// Returns `lower ... upper` when it is a valid range, otherwise `fallback ... fallback`.
+    ///
+    /// `ClosedRange` traps when `lower > upper`. NaN bounds are treated as invalid explicitly,
+    /// because how `Date` comparison handles NaN differs between Foundation versions.
+    private static func clampedRange(_ lower: Date, _ upper: Date, fallback: Date) -> ClosedRange<Date> {
+        let isNaN = lower.timeIntervalSinceReferenceDate.isNaN || upper.timeIntervalSinceReferenceDate.isNaN
+        return !isNaN && lower <= upper ? lower ... upper : fallback ... fallback
     }
 
     /// The time at which the timer is set to resume if it is currently paused.
@@ -111,11 +138,19 @@ public struct TimerState: Sendable, Codable, Hashable {
             }
         case .timer(let duration):
             if let pausePeriod = pausePeriods.last, pausePeriod.start == nil {
-                startDate.addingTimeInterval(duration - elapsedTime)
+                // Never earlier than `startDate` (or NaN), so it stays consistent with
+                // `timerInterval` even when the duration has already been exceeded.
+                // Unchanged whenever `duration - elapsedTime >= 0`.
+                startDate.addingTimeInterval(Self.nonNegativeOrZero(duration - elapsedTime))
             } else {
                 nil
             }
         }
+    }
+
+    /// Returns `value` if it is `>= 0`, otherwise `0` (including NaN).
+    private static func nonNegativeOrZero(_ value: TimeInterval) -> TimeInterval {
+        value >= 0 ? value : 0
     }
 
     public init(
