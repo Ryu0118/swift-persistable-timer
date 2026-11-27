@@ -117,9 +117,11 @@ public struct TimerState: Sendable, Codable, Hashable {
 
     /// Returns `lower ... upper` when it is a valid range, otherwise `fallback ... fallback`.
     ///
-    /// `ClosedRange` traps when `lower > upper` (or when the comparison is undefined, e.g. NaN dates).
+    /// `ClosedRange` traps when `lower > upper`. NaN bounds are treated as invalid explicitly,
+    /// because how `Date` comparison handles NaN differs between Foundation versions.
     private static func clampedRange(_ lower: Date, _ upper: Date, fallback: Date) -> ClosedRange<Date> {
-        lower <= upper ? lower ... upper : fallback ... fallback
+        let isNaN = lower.timeIntervalSinceReferenceDate.isNaN || upper.timeIntervalSinceReferenceDate.isNaN
+        return !isNaN && lower <= upper ? lower ... upper : fallback ... fallback
     }
 
     /// The time at which the timer is set to resume if it is currently paused.
